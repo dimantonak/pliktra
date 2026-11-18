@@ -20,8 +20,9 @@
     <div class="seg" id="handSeg" role="group" aria-label="Hands">
       <button data-hand="B" class="on">Both</button><button data-hand="R">Right</button><button data-hand="L">Left</button>
     </div>
-    <button id="btnRestart" class="btn">&#8634; Restart</button>
-    <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key">&#9995; Fingers</button>
+    <button id="btnRestart" class="btn" title="Restart">&#8634;<span class="lbl"> Restart</span></button>
+    <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key">&#9995;<span class="lbl"> Fingers</span></button>
+    <button id="btnView" class="btn toggle" aria-pressed="false" title="Show sheet music instead of falling notes">&#9835;<span class="lbl"> Sheet</span></button>
     <input type="range" id="progress" min="0" max="0" value="0" aria-label="Position in song">
     <span id="stepCount" class="stat">0 / 0</span>
     <span id="mistakes" class="stat">Mistakes 0</span>
@@ -29,6 +30,10 @@
 
   <main class="stage-wrap">
     <canvas id="stage"></canvas>
+    <div id="sheet" class="score" hidden>
+      <div id="sheetInner"><div id="sheetCursor"></div><div id="sheetSvg"></div></div>
+      <div id="sheetMsg" class="sheet-msg"></div>
+    </div>
     <div id="hint" class="hint"></div>
   </main>
 
@@ -128,8 +133,10 @@
     </div>
   </div>
 
+  <script src="vendor/vexflow/vexflow-bravura.js"></script>
   <script src="js/notation.js"></script>
   <script src="js/midifile.js"></script>
+  <script src="js/sheet.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

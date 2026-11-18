@@ -33,9 +33,10 @@ function parseNoteName(s) {
 //   E4/3  G3/4+B3/2   finger to use (1 = thumb ... 5 = little finger)
 //   C4_2  G4_0.5      length in beats (only affects spacing in the note lane)
 //   -  -_2            rest
+//   3/4               time signature (only at the start; default 4/4)
 //   |  and  // comments are ignored
 function parseSongText(text) {
-  var notes = [], errors = [], beat = 0, steps = 0;
+  var notes = [], errors = [], rests = [], meter = [4, 4], beat = 0, steps = 0;
   var lines = String(text || '').split(/\r?\n/);
   for (var li = 0; li < lines.length; li++) {
     var clean = lines[li].replace(/\/\/.*$/, '');
@@ -49,7 +50,14 @@ function parseSongText(text) {
         body = tok.slice(0, u);
         if (!(dur > 0)) { errors.push('"' + tok + '": the length after _ must be a number'); continue; }
       }
-      if (body === '-') { beat += dur; continue; }
+      if (body === '-') { rests.push(round3(beat * BEAT_SEC)); beat += dur; continue; }
+      var tm = /^(\d+)\/(\d+)$/.exec(body);                   // time signature, e.g. 3/4
+      if (tm) {
+        if (beat > 0) errors.push('"' + tok + '": a time signature can only be at the start');
+        else if (!(+tm[1] > 0) || [2, 4, 8, 16].indexOf(+tm[2]) < 0) errors.push('"' + tok + '" is not a time signature');
+        else meter = [+tm[1], +tm[2]];
+        continue;
+      }
       var parts = body.split('+'), stepNotes = [], bad = false;
       for (var pi = 0; pi < parts.length; pi++) {
         var hm = /^([LRlr]):(.*)$/.exec(parts[pi]);
@@ -80,7 +88,8 @@ function parseSongText(text) {
     }
   }
   sortNotes(notes);
-  return { notes: notes, errors: errors, steps: steps };
+  // rests: times (s) of "-" tokens; meter: [beats, unit]; beats: total length in quarter-note beats
+  return { notes: notes, errors: errors, steps: steps, rests: rests, meter: meter, beats: beat };
 }
 
 // Keeps the spelling of flats as written ("Bb3" stays "Bb3" instead of "A#3").

@@ -35,7 +35,7 @@
     return { id: newId(), title: title, kind: 'text', text: text, notes: parseSongText(text).notes };
   }
 
-  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true }, store.get('pliktra.settings', {}));
+  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'lane' }, store.get('pliktra.settings', {}));
   var songs = store.get('pliktra.songs', null);
   if (!Array.isArray(songs)) {
     songs = BUILTIN.map(function (b) { return songFromText(b.title, b.text); });
@@ -132,6 +132,79 @@
     prog.value = Math.min(st.idx, Math.max(0, n - 1));
     $('#stepCount').textContent = Math.min(st.idx + (st.finished ? 0 : 1), n) + ' / ' + n;
     $('#mistakes').textContent = 'Mistakes ' + st.mistakes;
+    updateSheetCursor(false);
+  }
+
+  // ---------------------------------------------------------------- sheet music view
+  var sheetState = { key: '', data: null };
+
+  function sheetOn() { return settings.view === 'sheet'; }
+
+  function refreshSheet() {
+    var box = $('#sheet'), inner = $('#sheetInner'), msgEl = $('#sheetMsg');
+    box.hidden = !sheetOn();
+    $('#hint').style.top = sheetOn() && geo ? (geo.kbTop - 36) + 'px' : '';
+    dirty = true;
+    if (!sheetOn() || !geo) return;
+    box.style.height = geo.kbTop + 'px';
+    var msg = '';
+    if (!st.song) msg = 'Choose a song to see its sheet music.';
+    else if (st.song.kind !== 'text') msg = 'Sheet music is available for typed songs. MIDI files are shown as falling notes (tap ♫ Sheet to switch back).';
+    else if (!Sheet.available()) msg = 'The sheet music could not be loaded. Check the internet connection and reload.';
+    if (!msg) {
+      var scale = Math.max(0.5, Math.min(1.5, (geo.kbTop - 8) / 290));
+      var key = [st.song.id, settings.fingers, scale.toFixed(3), st.song.text].join('|');
+      if (key !== sheetState.key) {
+        try {
+          sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale });
+          sheetState.key = key;
+        } catch (e) {
+          if (window.console) console.error(e);
+          sheetState.data = null; sheetState.key = '';
+          msg = 'This song can’t be shown as sheet music yet.';
+        }
+      }
+    }
+    msgEl.textContent = msg;
+    inner.style.display = msg ? 'none' : '';
+    if (msg) return;
+    inner.style.width = sheetState.data.width + 'px';
+    inner.style.marginTop = Math.max(0, (geo.kbTop - sheetState.data.height) / 2) + 'px';
+    $('#sheetCursor').style.width = Math.round(28 * Math.max(0.6, sheetState.data.height / 290)) + 'px';
+    updateSheetCursor(true);
+  }
+
+  // Colours the notes to play now, fades the ones already played and scrolls them into view.
+  function updateSheetCursor(instant) {
+    var d = sheetState.data;
+    if (!d || !sheetOn() || $('#sheet').hidden) return;
+    var step = currentStep();
+    var curKey = step && !st.finished ? Sheet.beatKey(step.t / BEAT_SEC) : null;
+    var curBeat = curKey != null ? parseFloat(curKey) : Infinity;
+    var curX = null;
+    Object.keys(d.marks).forEach(function (k) {
+      var beat = parseFloat(k);
+      d.marks[k].forEach(function (mk) {
+        if (!mk.el) return;
+        var isCur = k === curKey && (st.hand === 'B' || mk.hand === st.hand);
+        mk.el.classList.toggle('cur-R', isCur && mk.hand === 'R');
+        mk.el.classList.toggle('cur-L', isCur && mk.hand === 'L');
+        mk.el.classList.toggle('past', beat < curBeat - 1e-6);
+        if (isCur) curX = curX == null ? mk.x : Math.min(curX, mk.x);
+      });
+    });
+    var wrapW = $('#sheet').clientWidth, inner = $('#sheetInner'), cursor = $('#sheetCursor');
+    var minTx = Math.min(0, wrapW - d.width - 20);
+    var tx = curX != null ? wrapW * 0.3 - curX : (st.finished ? minTx : 0);
+    tx = Math.min(0, Math.max(minTx, tx));
+    if (instant) { inner.style.transition = 'none'; cursor.style.transition = 'none'; }
+    inner.style.transform = 'translateX(' + Math.round(tx) + 'px)';
+    cursor.style.display = curX == null ? 'none' : '';
+    if (curX != null) cursor.style.left = Math.round(curX - parseFloat(cursor.style.width || 28) / 2 + 6) + 'px';
+    if (instant) {
+      void inner.offsetWidth;   // apply without animation, then re-enable it
+      inner.style.transition = ''; cursor.style.transition = '';
+    }
   }
 
   function updateHint() {
@@ -298,6 +371,7 @@
     var kbH = Math.max(90, Math.min(230, H * 0.34, ww * 6.5));
     geo = { lo: lo, hi: hi, whites: whites, idxOf: idxOf, ww: ww, kbTop: H - kbH, kbH: kbH, bw: ww * 0.6, bh: kbH * 0.62 };
     dirty = true;
+    refreshSheet();
   }
 
   function keyRect(m) {
@@ -347,7 +421,7 @@
     }
 
     var step = currentStep();
-    if (st.song && st.steps.length && !st.finished) {
+    if (st.song && st.steps.length && !st.finished && !sheetOn()) {
       var pps = laneH / 4;                       // pixels per second: ~4 s of music visible
       var maxT = st.viewT + laneH / pps + 0.5;
       var notes = st.song.notes;
@@ -850,9 +924,22 @@
     settings.fingers = !settings.fingers;
     store.set('pliktra.settings', settings);
     showFingerToggle();
+    refreshSheet();
     dirty = true;
   };
   showFingerToggle();
+  function showViewToggle() {
+    var b = $('#btnView');
+    b.classList.toggle('on', sheetOn());
+    b.setAttribute('aria-pressed', sheetOn() ? 'true' : 'false');
+  }
+  $('#btnView').onclick = function () {
+    settings.view = sheetOn() ? 'lane' : 'sheet';
+    store.set('pliktra.settings', settings);
+    showViewToggle();
+    refreshSheet();
+  };
+  showViewToggle();
   $('#btnAgain').onclick = function () { closeModal('mResult'); restart(0); };
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
