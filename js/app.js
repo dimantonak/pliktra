@@ -126,10 +126,23 @@
       st.hits[m] = true;
       var done = step.notes.every(function (n) { return st.hits[n]; });
       if (done) advance();
+    } else if (otherHandNote(m, step)) {
+      // One-hand practice: playing the other hand's part along with it is not a mistake.
     } else {
       wrong[m] = performance.now();
       if (st.startTime) { st.mistakes++; st.stepMistake = true; updateStats(); }
     }
+  }
+
+  // True if, in one-hand practice, key m belongs to the other hand's part near the current step.
+  function otherHandNote(m, step) {
+    if (st.hand === 'B') return false;
+    var prevT = st.idx > 0 ? st.steps[st.idx - 1].t : -1;
+    var notes = st.song.notes;
+    for (var k = firstNoteAtOrAfter(notes, prevT - 0.05); k < notes.length && notes[k].t <= step.t + 0.6; k++) {
+      if (notes[k].m === m && notes[k].h !== st.hand) return true;
+    }
+    return false;
   }
 
   function advance() {
@@ -160,6 +173,7 @@
 
   function refreshSheet() {
     var box = $('#sheet'), inner = $('#sheetInner'), msgEl = $('#sheetMsg');
+    var sheetLib = typeof Sheet !== 'undefined' && Sheet.available();
     box.hidden = !sheetOn();
     $('#hint').style.top = sheetOn() && geo ? (geo.kbTop - 36) + 'px' : '';
     dirty = true;
@@ -168,7 +182,7 @@
     var msg = '';
     if (!st.song) msg = 'Choose a song to see its sheet music.';
     else if (st.song.kind !== 'text') msg = 'Sheet music is available for typed songs. MIDI files are shown as falling notes (tap ♫ Sheet to switch back).';
-    else if (!Sheet.available()) msg = 'The sheet music could not be loaded. Check the internet connection and reload.';
+    else if (!sheetLib) msg = 'The sheet music could not be loaded. Check the internet connection and reload.';
     if (!msg) {
       var scale = Math.max(0.5, Math.min(1.5, (geo.kbTop - 8) / 290));
       var key = [st.song.id, settings.fingers, scale.toFixed(3), st.song.text].join('|');
@@ -185,7 +199,11 @@
     }
     msgEl.textContent = msg;
     inner.style.display = msg ? 'none' : '';
-    if (msg) return;
+    if (msg) {   // forget the old score so nothing refers to it
+      sheetState.key = ''; sheetState.data = null;
+      $('#sheetSvg').innerHTML = '';
+      return;
+    }
     inner.style.width = sheetState.data.width + 'px';
     inner.style.marginTop = Math.max(0, (geo.kbTop - sheetState.data.height) / 2) + 'px';
     $('#sheetCursor').style.width = Math.round(28 * Math.max(0.6, sheetState.data.height / 290)) + 'px';
@@ -262,8 +280,14 @@
   }
 
   // ---------------------------------------------------------------- note input (all sources)
+  var midiHeld = {};   // keys currently held on the piano (to release them if the piano goes away)
+  var lastNoteAt = 0;
+
   function noteOn(m, src) {
     held[m] = (held[m] || 0) + 1;
+    if (src === 'midi') midiHeld[m] = true;
+    lastNoteAt = performance.now();
+    if (st.startTime && !st.finished) requestWakeLock();
     if (src !== 'midi' && settings.sound) synth.on(m);
     if (isOpen('mEditor')) { if (recording) recordNote(m); }
     else if (!anyModalOpen()) practiceNote(m);
@@ -272,6 +296,10 @@
   }
 
   function noteOff(m, src) {
+    if (src === 'midi') {
+      if (!midiHeld[m]) return;   // already released (e.g. after the piano was unplugged)
+      delete midiHeld[m];
+    }
     var c = (held[m] || 0) - 1;
     if (c > 0) held[m] = c; else delete held[m];
     if (src !== 'midi') synth.off(m);
@@ -307,7 +335,7 @@
     });
   }
 
-  function bindInputs() {
+  function bindInputs(e) {
     var names = [];
     midiAccess.inputs.forEach(function (input) {
       input.onmidimessage = onMidiMessage;
@@ -315,6 +343,12 @@
     });
     if (names.length) setStatus('🎹 ' + names.join(', '), 'ok');
     else setStatus('No piano connected', 'warn');
+    if (e && e.port && e.port.state === 'disconnected') releaseMidiNotes();
+  }
+
+  // Lets go of all piano keys we think are held (their note-off messages may never arrive).
+  function releaseMidiNotes() {
+    Object.keys(midiHeld).forEach(function (m) { noteOff(+m, 'midi'); });
   }
 
   function onMidiMessage(e) {
@@ -695,6 +729,8 @@
         if (!confirm('Delete “' + s.title + '”?')) return;
         songs = songs.filter(function (x) { return x !== s; });
         saveSongs();
+        ['B', 'R', 'L'].forEach(function (h) { delete best[s.id + ':' + h]; });
+        store.set('pliktra.best', best);
         if (st.song === s) loadSong(null);
         renderLibrary();
       };
@@ -903,7 +939,7 @@
       });
     });
     if (!notes.length) { alert('Choose a hand for at least one part.'); return; }
-    var t0 = Math.min.apply(null, notes.map(function (n) { return n.t; }));
+    var t0 = notes.reduce(function (a, n) { return Math.min(a, n.t); }, Infinity);
     notes.forEach(function (n) { n.t = Math.round((n.t - t0) * 1000) / 1000; n.d = Math.round(n.d * 1000) / 1000; });
     sortNotes(notes);
     var song = { id: newId(), title: $('#imTitle').value.trim() || 'Imported song', kind: 'midi', notes: notes };
@@ -958,7 +994,7 @@
     refreshSheet();
   };
   showViewToggle();
-  $('#btnAgain').onclick = function () { closeModal('mResult'); restart(0); };
+  $('#btnAgain').onclick = function () { closeModal('mResult'); restart(st.startIdx); };   // same section again
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
   document.querySelectorAll('#handSeg button').forEach(function (b) {
@@ -971,17 +1007,25 @@
 
   // ---------------------------------------------------------------- keep the screen awake while practising
   var wakeLock = null;
+  var wakeLockPending = false;
   function requestWakeLock() {
-    if (!('wakeLock' in navigator) || wakeLock) return;
+    if (!('wakeLock' in navigator) || wakeLock || wakeLockPending) return;
+    wakeLockPending = true;
     navigator.wakeLock.request('screen').then(function (l) {
+      wakeLockPending = false;
       wakeLock = l;
-      l.addEventListener('release', function () { wakeLock = null; });
-    }).catch(function () { /* not allowed here; fine */ });
+      l.addEventListener('release', function () { if (wakeLock === l) wakeLock = null; });
+    }).catch(function () { wakeLockPending = false; /* not allowed here; fine */ });
   }
   function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock = null; } }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && st.startTime && !st.finished) requestWakeLock();
+    if (document.visibilityState === 'hidden') releaseMidiNotes();
   });
+  // Let the screen sleep again after 3 minutes without playing.
+  setInterval(function () {
+    if (wakeLock && performance.now() - lastNoteAt > 180000) releaseWakeLock();
+  }, 30000);
 
   // ---------------------------------------------------------------- start
   window.addEventListener('resize', resize);
