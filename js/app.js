@@ -27,8 +27,16 @@
     { title: 'Twinkle Twinkle (both hands)',
       text: 'C3+C4 C4 E3+G4 G4 | F3+A4 A4 E3+G4_2 | D3+F4 F4 C3+E4 E4 | G2+D4 D4 C3+C4_2 |\n' +
             'E3+G4 G4 D3+F4 F4 | C3+E4 E4 G2+D4_2 | E3+G4 G4 D3+F4 F4 | C3+E4 E4 G2+D4_2 |\n' +
-            'C3+C4 C4 E3+G4 G4 | F3+A4 A4 E3+G4_2 | D3+F4 F4 C3+E4 E4 | G2+D4 D4 C3+C4_2' }
+            'C3+C4 C4 E3+G4 G4 | F3+A4 A4 E3+G4_2 | D3+F4 F4 C3+E4 E4 | G2+D4 D4 C3+C4_2' },
+    // Melody by James Lord Pierpont (1857, public domain); simple arrangement written for Pliktra.
+    { title: 'Jingle Bells (chorus, both hands)',
+      text: 'C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 G4/5 C4/1_1.5 D4/2_0.5 | C3/5+E4/3_4 |\n' +
+            'F3/2+F4/4 F4/4 F4/4_1.5 F4/4_0.5 | C3/5+F4/4 E4/3 E4/3 E4/3_0.5 E4/3_0.5 | G3/1+E4/3 D4/2 D4/2 E4/3 | G3/1+D4/2_2 G4/5_2 |\n' +
+            'C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 G4/5 C4/1_1.5 D4/2_0.5 | C3/5+E4/3_4 |\n' +
+            'F3/2+F4/4 F4/4 F4/4_1.5 F4/4_0.5 | C3/5+F4/4 E4/3 E4/3 E4/3_0.5 E4/3_0.5 | G3/1+G4/5 G4/5 F4/4 D4/2 | C3/5+C4/1_4' }
   ];
+  // Built-ins from the first version; devices without a record of seen built-ins already had these.
+  var FIRST_BUILTINS = ['C major scale (both hands)', 'Ode to Joy (right hand)', 'Twinkle Twinkle (both hands)'];
 
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function songFromText(title, text) {
@@ -37,10 +45,12 @@
 
   var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'lane' }, store.get('pliktra.settings', {}));
   var songs = store.get('pliktra.songs', null);
+  var seenBuiltins = store.get('pliktra.builtinsSeen', null);
   if (!Array.isArray(songs)) {
     songs = BUILTIN.map(function (b) { return songFromText(b.title, b.text); });
-    store.set('pliktra.songs', songs);
+    seenBuiltins = [];
   } else {
+    if (!Array.isArray(seenBuiltins)) seenBuiltins = FIRST_BUILTINS.slice();
     songs.forEach(function (s) {
       if (s.kind !== 'text') return;
       BUILTIN.forEach(function (b) {   // upgrade unedited built-in songs
@@ -48,8 +58,16 @@
       });
       s.notes = parseSongText(s.text).notes;   // re-read typed songs so new notation features apply
     });
-    store.set('pliktra.songs', songs);
+    // Built-ins added in later versions appear once; a deleted built-in doesn't come back.
+    BUILTIN.slice().reverse().forEach(function (b) {
+      if (seenBuiltins.indexOf(b.title) < 0 && !songs.some(function (s) { return s.title === b.title; })) {
+        songs.unshift(songFromText(b.title, b.text));
+      }
+    });
   }
+  BUILTIN.forEach(function (b) { if (seenBuiltins.indexOf(b.title) < 0) seenBuiltins.push(b.title); });
+  store.set('pliktra.builtinsSeen', seenBuiltins);
+  store.set('pliktra.songs', songs);
   var best = store.get('pliktra.best', {});
 
   function saveSongs() {
