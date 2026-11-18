@@ -604,21 +604,33 @@
     history.replaceState(null, '', location.pathname + location.search);
     var data = null;
     try { data = JSON.parse(b64urlDecode(m[1])); } catch (e) { /* handled below */ }
-    if (!data || typeof data.t !== 'string' || typeof data.s !== 'string' || data.s.length > 20000) {
-      alert('This song link is damaged.');
+    // A link holds one song {t, s} or a list of them [{t, s}, ...]
+    var list = Array.isArray(data) ? data : [data];
+    var valid = list.length > 0 && list.length <= 50 && list.every(function (d) {
+      return d && typeof d.t === 'string' && typeof d.s === 'string' && d.s.length <= 20000;
+    });
+    if (!valid) { alert('This song link is damaged.'); return false; }
+
+    var toAdd = [], firstExisting = null;
+    for (var i = 0; i < list.length; i++) {
+      var title = list[i].t.trim().slice(0, 120) || 'Shared song', text = list[i].s;
+      var same = songs.filter(function (x) { return x.kind === 'text' && x.title === title && x.text === text; })[0];
+      if (same) { firstExisting = firstExisting || same; continue; }   // already added earlier
+      var r = parseSongText(text);
+      if (r.errors.length || !r.notes.length) { alert('“' + title + '” in this link contains mistakes and can’t be added.'); return false; }
+      toAdd.push({ title: title, text: text });
+    }
+    if (!toAdd.length) {
+      if (firstExisting) { closeAll(); loadSong(firstExisting); return true; }
       return false;
     }
-    var title = data.t.trim().slice(0, 120) || 'Shared song';
-    var same = songs.filter(function (x) { return x.kind === 'text' && x.title === title && x.text === data.s; })[0];
-    if (same) { closeAll(); loadSong(same); return true; }
-    var r = parseSongText(data.s);
-    if (r.errors.length || !r.notes.length) { alert('This song link contains mistakes and can’t be added.'); return false; }
-    if (!confirm('Add “' + title + '” to your songs?')) return false;
-    var song = songFromText(title, data.s);
-    songs.unshift(song);
-    if (!saveSongs()) { songs.shift(); return false; }
+    var names = toAdd.map(function (x) { return '“' + x.title + '”'; }).join(', ');
+    if (!confirm(toAdd.length === 1 ? 'Add ' + names + ' to your songs?' : 'Add these ' + toAdd.length + ' songs: ' + names + '?')) return false;
+    var created = toAdd.map(function (x) { return songFromText(x.title, x.text); });
+    songs = created.concat(songs);
+    if (!saveSongs()) { songs = songs.slice(created.length); return false; }
     closeAll();
-    loadSong(song);
+    loadSong(created[0]);
     return true;
   }
   window.addEventListener('hashchange', importFromHash);
