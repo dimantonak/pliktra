@@ -55,16 +55,18 @@ function parseSongText(text) {
         var name = hm ? hm[2] : parts[pi];
         var m = parseNoteName(name);
         if (m == null) { errors.push('"' + parts[pi] + '" is not a note on the piano'); bad = true; break; }
-        stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L') });
+        stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L'), s: spelled(name) });
       }
       if (bad) continue;
       for (var si = 0; si < stepNotes.length; si++) {
-        notes.push({
+        var note = {
           m: stepNotes[si].m,
           t: round3(beat * BEAT_SEC),
           d: round3(dur * BEAT_SEC * 0.92),
           h: stepNotes[si].h
-        });
+        };
+        if (stepNotes[si].s) note.s = stepNotes[si].s;
+        notes.push(note);
       }
       beat += dur;
       steps++;
@@ -73,6 +75,15 @@ function parseSongText(text) {
   sortNotes(notes);
   return { notes: notes, errors: errors, steps: steps };
 }
+
+// Keeps the spelling of flats as written ("Bb3" stays "Bb3" instead of "A#3").
+// Returns null for other notes, which are shown with the default (sharp) names.
+function spelled(name) {
+  var r = /^([A-Ga-g])([b♭])(-?\d)?$/.exec(name);
+  return r ? r[1].toUpperCase() + 'b' + (r[3] != null ? r[3] : '4') : null;
+}
+
+function noteLabel(n) { return n.s || midiToName(n.m); }
 
 function round3(x) { return Math.round(x * 1000) / 1000; }
 

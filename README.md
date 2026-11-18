@@ -30,6 +30,8 @@ connect the piano with a USB-B to USB-C cable.
   lengths `C4_2`, rests `-`. Full help is in the song editor.
 - **Record from piano**: in the editor, press *Record from piano* and play; notes are typed for you.
 - **MIDI files** (`.mid`): import from the Songs screen and choose which hand plays each part.
+- **Song links**: *Share* on a typed song makes a link; opening it on another device adds the song there.
+  The song is inside the link itself (after `#`), so it is never stored on the website or in this repository.
 
 Songs, settings and best scores are saved in the browser on that device (localStorage).
 

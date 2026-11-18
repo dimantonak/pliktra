@@ -359,7 +359,7 @@
         ctx.shadowBlur = 0;
         if (settings.laneLabels && active && r.w >= 16) {
           ctx.fillStyle = '#0b1220';
-          var label = r.w >= 30 ? midiToName(n.m) : midiToName(n.m).replace(/-?\d+$/, '');
+          var label = r.w >= 30 ? noteLabel(n) : noteLabel(n).replace(/-?\d+$/, '');
           ctx.fillText(label, r.x + r.w / 2, yb - 3);
         }
       }
@@ -559,10 +559,69 @@
         if (st.song === s) loadSong(null);
         renderLibrary();
       };
-      li.appendChild(play); li.appendChild(edit); li.appendChild(del);
+      li.appendChild(play); li.appendChild(edit);
+      if (s.kind !== 'midi') {
+        var share = el('button', 'btn small', 'Share');
+        share.onclick = function () { shareSong(s); };
+        li.appendChild(share);
+      }
+      li.appendChild(del);
       ul.appendChild(li);
     });
   }
+
+  // ---------------------------------------------------------------- song links (#song=...)
+  // The song travels inside the link's #fragment, which browsers never send to the server,
+  // so shared songs are not stored on the website or in the repository.
+  function b64urlEncode(str) {
+    var bytes = new TextEncoder().encode(str), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlDecode(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function shareSong(song) {
+    var url = location.origin + location.pathname + '#song=' + b64urlEncode(JSON.stringify({ t: song.title, s: song.text }));
+    if (navigator.share) { navigator.share({ title: song.title, url: url }).catch(function () { /* cancelled */ }); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        alert('Link copied. Open it on another device to add “' + song.title + '” there.');
+      }, function () { prompt('Copy this link:', url); });
+      return;
+    }
+    prompt('Copy this link:', url);
+  }
+
+  function importFromHash() {
+    var m = /^#song=([A-Za-z0-9_-]+)$/.exec(location.hash);
+    if (!m) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    var data = null;
+    try { data = JSON.parse(b64urlDecode(m[1])); } catch (e) { /* handled below */ }
+    if (!data || typeof data.t !== 'string' || typeof data.s !== 'string' || data.s.length > 20000) {
+      alert('This song link is damaged.');
+      return false;
+    }
+    var title = data.t.trim().slice(0, 120) || 'Shared song';
+    var same = songs.filter(function (x) { return x.kind === 'text' && x.title === title && x.text === data.s; })[0];
+    if (same) { closeAll(); loadSong(same); return true; }
+    var r = parseSongText(data.s);
+    if (r.errors.length || !r.notes.length) { alert('This song link contains mistakes and can’t be added.'); return false; }
+    if (!confirm('Add “' + title + '” to your songs?')) return false;
+    var song = songFromText(title, data.s);
+    songs.unshift(song);
+    if (!saveSongs()) { songs.shift(); return false; }
+    closeAll();
+    loadSong(song);
+    return true;
+  }
+  window.addEventListener('hashchange', importFromHash);
 
   // ---------------------------------------------------------------- editor
   var editing = null, recording = false, chordStart = 0;
@@ -740,7 +799,7 @@
   if (window.ResizeObserver) new ResizeObserver(resize).observe(cv.parentElement);
   resize();
   var lastId = store.get('pliktra.lastSong', null);
-  loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || songs[0] || null);
+  if (!importFromHash()) loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || songs[0] || null);
   initMidi();
   requestAnimationFrame(frame);
 })();

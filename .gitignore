@@ -1,0 +1,5 @@
+# photos of sheet music (copyrighted) stay local
+*.jpg
+*.jpeg
+*.png
+*.heic
