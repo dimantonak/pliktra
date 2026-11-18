@@ -92,6 +92,8 @@ body {
 .btn.danger { color: var(--bad); }
 .btn.icon { width: 40px; padding: 0; justify-content: center; }
 .btn.small { min-height: 34px; padding: 0 10px; font-size: 14px; }
+.btn.toggle { color: var(--muted); }
+.btn.toggle.on { background: rgba(79, 157, 255, .18); border-color: var(--accent); color: var(--text); }
 .btn.rec.on { background: var(--bad); border-color: var(--bad); color: #fff; }
 
 .seg {

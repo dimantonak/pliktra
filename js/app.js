@@ -12,13 +12,18 @@
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
   };
 
+  // `prev`: earlier versions of a built-in song; an unedited copy on the device is upgraded.
   var BUILTIN = [
     { title: 'C major scale (both hands)',
-      text: 'L:C3+R:C4 L:D3+R:D4 L:E3+R:E4 L:F3+R:F4 L:G3+R:G4 L:A3+R:A4 L:B3+R:B4 L:C4+R:C5_2\n' +
-            'L:B3+R:B4 L:A3+R:A4 L:G3+R:G4 L:F3+R:F4 L:E3+R:E4 L:D3+R:D4 L:C3+R:C4_2' },
+      text: 'L:C3/5+R:C4/1 L:D3/4+R:D4/2 L:E3/3+R:E4/3 L:F3/2+R:F4/1 L:G3/1+R:G4/2 L:A3/3+R:A4/3 L:B3/2+R:B4/4 L:C4/1+R:C5/5_2\n' +
+            'L:B3/2+R:B4/4 L:A3/3+R:A4/3 L:G3/1+R:G4/2 L:F3/2+R:F4/1 L:E3/3+R:E4/3 L:D3/4+R:D4/2 L:C3/5+R:C4/1_2',
+      prev: ['L:C3+R:C4 L:D3+R:D4 L:E3+R:E4 L:F3+R:F4 L:G3+R:G4 L:A3+R:A4 L:B3+R:B4 L:C4+R:C5_2\n' +
+             'L:B3+R:B4 L:A3+R:A4 L:G3+R:G4 L:F3+R:F4 L:E3+R:E4 L:D3+R:D4 L:C3+R:C4_2'] },
     { title: 'Ode to Joy (right hand)',
-      text: 'E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | E4_1.5 D4_0.5 D4_2 |\n' +
-            'E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | D4_1.5 C4_0.5 C4_2' },
+      text: 'E4/3 E4/3 F4/4 G4/5 | G4/5 F4/4 E4/3 D4/2 | C4/1 C4/1 D4/2 E4/3 | E4/3_1.5 D4/2_0.5 D4/2_2 |\n' +
+            'E4/3 E4/3 F4/4 G4/5 | G4/5 F4/4 E4/3 D4/2 | C4/1 C4/1 D4/2 E4/3 | D4/2_1.5 C4/1_0.5 C4/1_2',
+      prev: ['E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | E4_1.5 D4_0.5 D4_2 |\n' +
+             'E4 E4 F4 G4 | G4 F4 E4 D4 | C4 C4 D4 E4 | D4_1.5 C4_0.5 C4_2'] },
     { title: 'Twinkle Twinkle (both hands)',
       text: 'C3+C4 C4 E3+G4 G4 | F3+A4 A4 E3+G4_2 | D3+F4 F4 C3+E4 E4 | G2+D4 D4 C3+C4_2 |\n' +
             'E3+G4 G4 D3+F4 F4 | C3+E4 E4 G2+D4_2 | E3+G4 G4 D3+F4 F4 | C3+E4 E4 G2+D4_2 |\n' +
@@ -30,10 +35,19 @@
     return { id: newId(), title: title, kind: 'text', text: text, notes: parseSongText(text).notes };
   }
 
-  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true }, store.get('pliktra.settings', {}));
+  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true }, store.get('pliktra.settings', {}));
   var songs = store.get('pliktra.songs', null);
   if (!Array.isArray(songs)) {
     songs = BUILTIN.map(function (b) { return songFromText(b.title, b.text); });
+    store.set('pliktra.songs', songs);
+  } else {
+    songs.forEach(function (s) {
+      if (s.kind !== 'text') return;
+      BUILTIN.forEach(function (b) {   // upgrade unedited built-in songs
+        if (b.prev && s.title === b.title && b.prev.indexOf(s.text) >= 0) s.text = b.text;
+      });
+      s.notes = parseSongText(s.text).notes;   // re-read typed songs so new notation features apply
+    });
     store.set('pliktra.songs', songs);
   }
   var best = store.get('pliktra.best', {});
@@ -350,17 +364,33 @@
         var done = isCur && st.hits[n.m];
         var r = keyRect(n.m);
         var yb = laneH - (n.t - st.viewT) * pps;
-        var h = Math.max(n.d * pps - 3, 14);
+        var showFinger = settings.fingers && active && n.f;
+        var h = Math.max(n.d * pps - 3, showFinger ? 24 : 14);
         ctx.globalAlpha = !active ? 0.28 : done ? 0.35 : 1;
         ctx.fillStyle = active ? HAND_COLOR[n.h] : '#7a8394';
         if (isCur && !done) { ctx.shadowColor = HAND_COLOR[n.h]; ctx.shadowBlur = 14; }
         rr(r.x + 1.5, yb - h, r.w - 3, h, 5);
         ctx.fill();
         ctx.shadowBlur = 0;
-        if (settings.laneLabels && active && r.w >= 16) {
+        var labelY = yb - 3, nameFits = true;
+        if (showFinger) {
+          var rad = Math.min(r.w * 0.36, 11, (h - 4) / 2);
+          var cy = yb - rad - 3;
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.beginPath(); ctx.arc(r.x + r.w / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#0b1220';
+          ctx.font = '800 ' + Math.round(rad * 1.35) + 'px system-ui, sans-serif';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(n.f), r.x + r.w / 2, cy + 1);
+          ctx.textBaseline = 'bottom';
+          ctx.font = '600 12px system-ui, sans-serif';
+          labelY = cy - rad - 2;
+          nameFits = h >= rad * 2 + 20;
+        }
+        if (settings.laneLabels && active && r.w >= 16 && nameFits) {
           ctx.fillStyle = '#0b1220';
           var label = r.w >= 30 ? noteLabel(n) : noteLabel(n).replace(/-?\d+$/, '');
-          ctx.fillText(label, r.x + r.w / 2, yb - 3);
+          ctx.fillText(label, r.x + r.w / 2, labelY);
         }
       }
       ctx.restore();
@@ -423,6 +453,23 @@
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(r.x + 3, top + 2, r.w - 6, geo.bh * 0.75);
       }
+    }
+
+    // finger numbers on the keys to play now
+    if (settings.fingers && step && !anyModalOpen()) {
+      step.notes.forEach(function (fm) {
+        var f = step.fingers && step.fingers[fm];
+        if (!f || fm < geo.lo || fm > geo.hi) return;
+        var kr = keyRect(fm), black = isBlack(fm);
+        var rad = black ? Math.min(kr.w * 0.42, 12) : Math.min(ww * 0.34, 14);
+        var cy = black ? top + geo.bh - rad - 6 : top + kh - rad - 28;
+        ctx.fillStyle = '#14171c';
+        ctx.beginPath(); ctx.arc(kr.x + kr.w / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 ' + Math.round(rad * 1.3) + 'px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(f), kr.x + kr.w / 2, cy + 1);
+      });
     }
   }
 
@@ -611,26 +658,39 @@
     });
     if (!valid) { alert('This song link is damaged.'); return false; }
 
-    var toAdd = [], firstExisting = null;
+    // Same title + same notes: already there. Same title + different notes: offer to update it
+    // (keeps the song's best scores). New title: add it.
+    var toAdd = [], toUpdate = [], firstExisting = null;
     for (var i = 0; i < list.length; i++) {
       var title = list[i].t.trim().slice(0, 120) || 'Shared song', text = list[i].s;
-      var same = songs.filter(function (x) { return x.kind === 'text' && x.title === title && x.text === text; })[0];
-      if (same) { firstExisting = firstExisting || same; continue; }   // already added earlier
+      var match = songs.filter(function (x) { return x.kind === 'text' && x.title === title; })[0];
+      if (match && match.text === text) { firstExisting = firstExisting || match; continue; }
       var r = parseSongText(text);
       if (r.errors.length || !r.notes.length) { alert('“' + title + '” in this link contains mistakes and can’t be added.'); return false; }
-      toAdd.push({ title: title, text: text });
+      if (match) toUpdate.push({ song: match, text: text });
+      else toAdd.push({ title: title, text: text });
     }
-    if (!toAdd.length) {
+    if (!toAdd.length && !toUpdate.length) {
       if (firstExisting) { closeAll(); loadSong(firstExisting); return true; }
       return false;
     }
-    var names = toAdd.map(function (x) { return '“' + x.title + '”'; }).join(', ');
-    if (!confirm(toAdd.length === 1 ? 'Add ' + names + ' to your songs?' : 'Add these ' + toAdd.length + ' songs: ' + names + '?')) return false;
+    function names(arr) { return arr.map(function (t) { return '“' + t + '”'; }).join(', '); }
+    var question = [];
+    if (toAdd.length) question.push('Add ' + names(toAdd.map(function (x) { return x.title; })) + ' to your songs');
+    if (toUpdate.length) question.push((toAdd.length ? 'update ' : 'Update ') + names(toUpdate.map(function (u) { return u.song.title; })) + ' with the new version');
+    if (!confirm(question.join(' and ') + '?')) return false;
+
+    var oldTexts = toUpdate.map(function (u) { return u.song.text; });
+    toUpdate.forEach(function (u) { u.song.text = u.text; u.song.notes = parseSongText(u.text).notes; });
     var created = toAdd.map(function (x) { return songFromText(x.title, x.text); });
     songs = created.concat(songs);
-    if (!saveSongs()) { songs = songs.slice(created.length); return false; }
+    if (!saveSongs()) {
+      songs = songs.slice(created.length);
+      toUpdate.forEach(function (u, k) { u.song.text = oldTexts[k]; u.song.notes = parseSongText(oldTexts[k]).notes; });
+      return false;
+    }
     closeAll();
-    loadSong(created[0]);
+    loadSong(created[0] || toUpdate[0].song);
     return true;
   }
   window.addEventListener('hashchange', importFromHash);
@@ -781,6 +841,18 @@
   $('#btnSongs').onclick = function () { renderLibrary(); openModal('mLibrary'); };
   $('#btnSettings').onclick = function () { openModal('mSettings'); };
   $('#btnRestart').onclick = function () { restart(0); };
+  function showFingerToggle() {
+    var b = $('#btnFingers');
+    b.classList.toggle('on', !!settings.fingers);
+    b.setAttribute('aria-pressed', settings.fingers ? 'true' : 'false');
+  }
+  $('#btnFingers').onclick = function () {
+    settings.fingers = !settings.fingers;
+    store.set('pliktra.settings', settings);
+    showFingerToggle();
+    dirty = true;
+  };
+  showFingerToggle();
   $('#btnAgain').onclick = function () { closeModal('mResult'); restart(0); };
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });

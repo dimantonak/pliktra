@@ -30,6 +30,7 @@ function parseNoteName(s) {
 //   C4 D4 E4          one step per word
 //   C4+E4+G4          chord
 //   L:C4 / R:C4       force hand (otherwise below C4 = left, C4 and above = right)
+//   E4/3  G3/4+B3/2   finger to use (1 = thumb ... 5 = little finger)
 //   C4_2  G4_0.5      length in beats (only affects spacing in the note lane)
 //   -  -_2            rest
 //   |  and  // comments are ignored
@@ -53,9 +54,14 @@ function parseSongText(text) {
       for (var pi = 0; pi < parts.length; pi++) {
         var hm = /^([LRlr]):(.*)$/.exec(parts[pi]);
         var name = hm ? hm[2] : parts[pi];
+        var finger = null, fm = /^(.*)\/(.*)$/.exec(name);       // "E4/3" = E4 with finger 3
+        if (fm) {
+          if (!/^[1-5]$/.test(fm[2])) { errors.push('"' + parts[pi] + '": the finger after / must be 1 to 5'); bad = true; break; }
+          name = fm[1]; finger = +fm[2];
+        }
         var m = parseNoteName(name);
         if (m == null) { errors.push('"' + parts[pi] + '" is not a note on the piano'); bad = true; break; }
-        stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L'), s: spelled(name) });
+        stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L'), s: spelled(name), f: finger });
       }
       if (bad) continue;
       for (var si = 0; si < stepNotes.length; si++) {
@@ -66,6 +72,7 @@ function parseSongText(text) {
           h: stepNotes[si].h
         };
         if (stepNotes[si].s) note.s = stepNotes[si].s;
+        if (stepNotes[si].f) note.f = stepNotes[si].f;
         notes.push(note);
       }
       beat += dur;
@@ -93,7 +100,7 @@ function sortNotes(notes) {
 }
 
 // Groups notes (filtered by hand: 'B' both, 'R', 'L') into steps the player must play.
-// Each step: { t, notes: [midi...], hands: {midi: 'R'|'L'} }
+// Each step: { t, notes: [midi...], hands: {midi: 'R'|'L'}, fingers: {midi: 1-5} }
 function buildSteps(notes, hand) {
   var steps = [];
   for (var i = 0; i < notes.length; i++) {
@@ -101,10 +108,15 @@ function buildSteps(notes, hand) {
     if (hand !== 'B' && n.h !== hand) continue;
     var last = steps[steps.length - 1];
     if (last && n.t - last.t < CHORD_TOLERANCE) {
-      if (last.notes.indexOf(n.m) < 0) { last.notes.push(n.m); last.hands[n.m] = n.h; }
+      if (last.notes.indexOf(n.m) < 0) {
+        last.notes.push(n.m); last.hands[n.m] = n.h;
+        if (n.f) last.fingers[n.m] = n.f;
+      }
     } else {
-      var hands = {}; hands[n.m] = n.h;
-      steps.push({ t: n.t, notes: [n.m], hands: hands });
+      var hands = {}, fingers = {};
+      hands[n.m] = n.h;
+      if (n.f) fingers[n.m] = n.f;
+      steps.push({ t: n.t, notes: [n.m], hands: hands, fingers: fingers });
     }
   }
   return steps;

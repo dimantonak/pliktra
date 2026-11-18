@@ -21,6 +21,7 @@
       <button data-hand="B" class="on">Both</button><button data-hand="R">Right</button><button data-hand="L">Left</button>
     </div>
     <button id="btnRestart" class="btn">&#8634; Restart</button>
+    <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key">&#9995; Fingers</button>
     <input type="range" id="progress" min="0" max="0" value="0" aria-label="Position in song">
     <span id="stepCount" class="stat">0 / 0</span>
     <span id="mistakes" class="stat">Mistakes 0</span>
@@ -62,6 +63,7 @@
           <li>Sharps and flats: <code>F#4</code>, <code>Bb3</code>.</li>
           <li>Keys played together (chord): join with <code>+</code>, e.g. <code>C4+E4+G4</code>.</li>
           <li>Hands: notes below middle C go to the left hand, the rest to the right. Force a hand with <code>L:</code> or <code>R:</code>, e.g. <code>L:C4+R:E4</code>.</li>
+          <li>Fingers: add <code>/</code> and the finger after a note: <code>E4/3</code>, <code>G3/4+B3/2</code>. 1 = thumb, 2 = index, 3 = middle, 4 = ring, 5 = little finger (same numbers for both hands).</li>
           <li>Length in beats (only changes the spacing on screen): <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat. <code>-</code> is a rest.</li>
           <li>Bar lines <code>|</code> and anything after <code>//</code> are ignored.</li>
           <li><b>Record from piano</b> adds what you play on the FP-60X to the end of the text.</li>
