@@ -136,5 +136,6 @@ function buildSteps(notes, hand) {
 
 if (typeof module !== 'undefined') {
   module.exports = { isBlack: isBlack, midiToName: midiToName, parseNoteName: parseNoteName,
-    parseSongText: parseSongText, buildSteps: buildSteps, sortNotes: sortNotes };
+    parseSongText: parseSongText, buildSteps: buildSteps, sortNotes: sortNotes,
+    spelled: spelled, noteLabel: noteLabel, BEAT_SEC: BEAT_SEC, CHORD_TOLERANCE: CHORD_TOLERANCE };
 }

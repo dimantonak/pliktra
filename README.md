@@ -32,6 +32,8 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
   The song is inside the link itself (after `#`), so it is never stored on the website or in this repository.
 
 Songs, settings and best scores are saved in the browser on that device (localStorage).
+In the Songs screen you can **share all songs** as one link, **save a backup file** (all songs and best scores)
+and **restore** it later or on another device.
 
 ## Practice views
 
@@ -41,6 +43,15 @@ Songs, settings and best scores are saved in the browser on that device (localSt
   Each hand's rhythm comes from the song text: a note lasts until that hand's next note,
   a rest or the bar line. Available for typed songs.
 - **✋ Fingers**: finger numbers (1 = thumb … 5 = little finger) on notes, keys and score.
+- **▶ Listen**: plays the song (the hands you are practising) from the current position, on the piano's
+  own sound when it is connected, otherwise through the device. Speed can be lowered in Settings.
+- **⟳ Loop**: repeat a hard part. Tap Loop at its first step, move the slider (or play on) to its last step
+  and tap *Set end*. Each round shows your wrong keys; tap Loop again to stop.
+
+## Install / offline
+
+On the website, use the browser's *Install app* or *Add to Home screen*. Pliktra then opens like an app
+and also works without internet (the newest version is loaded whenever you are online).
 
 ## Files
 
@@ -50,6 +61,9 @@ Songs, settings and best scores are saved in the browser on that device (localSt
 - `js/midifile.js` - `.mid` file reader
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
+- `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
+- `tests/` - automated tests: `node --test tests/`
+- `AGENTS.md` - background and rules for contributors and AI assistants
 
 No build step and no dependencies to install: plain HTML + JavaScript.
 To host your own copy, put the folder on any https web host (e.g. GitHub Pages);

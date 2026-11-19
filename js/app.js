@@ -43,7 +43,8 @@
     return { id: newId(), title: title, kind: 'text', text: text, notes: parseSongText(text).notes };
   }
 
-  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'lane' }, store.get('pliktra.settings', {}));
+  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'lane',
+    listenSpeed: '1', listenOnPiano: true }, store.get('pliktra.settings', {}));
   var songs = store.get('pliktra.songs', null);
   var seenBuiltins = store.get('pliktra.builtinsSeen', null);
   if (!Array.isArray(songs)) {
@@ -88,6 +89,15 @@
   var wrong = {};  // midi -> time of the last wrong press (for the red flash)
   var dirty = true;
 
+  // A–B loop: tap Loop at the first step of a hard part, move the slider (or play on) to its
+  // last step and tap "Set end". The part then repeats until Loop is tapped again.
+  var loop = { a: -1, b: -1, pending: false, laps: 0, lastMistakes: 0 };
+  function loopOn() { return loop.b >= 0; }
+  function clearLoop() { loop.a = loop.b = -1; loop.pending = false; loop.laps = 0; showLoopToggle(); }
+
+  var demo = null;       // Listen playback in progress (see "Listen" below)
+  var demoKeys = {};     // midi -> hand, keys sounding in the playback (lit on the keyboard)
+
   function currentStep() { return (st.idx < st.steps.length) ? st.steps[st.idx] : null; }
   function targetT() {
     if (!st.steps.length) return 0;
@@ -103,12 +113,15 @@
 
   function rebuildSteps() {
     st.steps = st.song ? buildSteps(st.song.notes, st.hand) : [];
+    clearLoop();
     layout();
     restart(0);
   }
 
   function restart(from) {
+    endDemo();
     st.idx = Math.max(0, Math.min(from || 0, Math.max(0, st.steps.length - 1)));
+    if (loopOn() && (st.idx < loop.a || st.idx > loop.b)) clearLoop();   // moved outside the loop
     st.startIdx = st.idx;
     st.hits = {}; st.stepMistake = false;
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
@@ -118,7 +131,7 @@
   }
 
   function practiceNote(m) {
-    if (!st.song || st.finished) return;
+    if (!st.song || st.finished || demo) return;
     var step = currentStep();
     if (!step) return;
     if (step.notes.indexOf(m) >= 0) {
@@ -149,6 +162,11 @@
     if (!st.stepMistake) st.clean++;
     st.idx++;
     st.hits = {}; st.stepMistake = false;
+    if (loopOn() && st.idx > loop.b) {   // end of the loop: count the round and go again
+      loop.laps++; loop.lastMistakes = st.mistakes;
+      restart(loop.a);
+      return;
+    }
     if (st.idx >= st.steps.length) {
       st.finished = true;
       setTimeout(showResult, 450);
@@ -161,7 +179,8 @@
     var prog = $('#progress');
     prog.max = Math.max(0, n - 1);
     prog.value = Math.min(st.idx, Math.max(0, n - 1));
-    $('#stepCount').textContent = Math.min(st.idx + (st.finished ? 0 : 1), n) + ' / ' + n;
+    $('#stepCount').textContent = Math.min(st.idx + (st.finished ? 0 : 1), n) + ' / ' + n +
+      (loopOn() ? ' · loop ' + (loop.a + 1) + '–' + (loop.b + 1) : '');
     $('#mistakes').textContent = 'Mistakes ' + st.mistakes;
     updateSheetCursor(false);
   }
@@ -235,10 +254,13 @@
         if (isCur) curX = curX == null ? mk.x : Math.min(curX, mk.x);
       });
     });
-    var wrapW = $('#sheet').clientWidth, inner = $('#sheetInner'), cursor = $('#sheetCursor');
-    var minTx = Math.min(0, wrapW - d.width - 20);
-    var tx = curX != null ? wrapW * 0.3 - curX : (st.finished ? minTx : 0);
-    tx = Math.min(0, Math.max(minTx, tx));
+    var wrapW = $('#sheet').clientWidth, inner = $('#sheetInner'), cursor = $('#sheetCursor'), tx;
+    if (d.width + 20 <= wrapW) tx = (wrapW - d.width) / 2;   // short piece: centre it
+    else {
+      var minTx = wrapW - d.width - 20;
+      tx = curX != null ? wrapW * 0.3 - curX : (st.finished ? minTx : 0);
+      tx = Math.min(0, Math.max(minTx, tx));
+    }
     if (instant) { inner.style.transition = 'none'; cursor.style.transition = 'none'; }
     inner.style.transform = 'translateX(' + Math.round(tx) + 'px)';
     cursor.style.display = curX == null ? 'none' : '';
@@ -253,6 +275,11 @@
     var h = '';
     if (!st.song) h = 'Tap “Songs” to choose a song';
     else if (!st.steps.length) h = st.hand === 'L' ? 'This song has no left-hand notes' : st.hand === 'R' ? 'This song has no right-hand notes' : 'This song has no notes';
+    else if (demo) h = 'Listening… then play it yourself';
+    else if (loop.pending) h = 'Loop: move the slider (or play on) to the last step of the part, then tap “Set end”';
+    else if (loopOn() && loop.laps && !st.startTime) {
+      h = 'Round ' + loop.laps + ': ' + (loop.lastMistakes ? loop.lastMistakes + ' wrong key' + (loop.lastMistakes > 1 ? 's' : '') : 'no wrong keys!') + ' — again';
+    }
     else if (!st.startTime && !st.finished) h = 'Play the highlighted key to start';
     $('#hint').textContent = h;
   }
@@ -401,8 +428,137 @@
       o.start(t); o2.start(t);
       voices[m] = { o: o, o2: o2, g: g };
     }
-    return { on: on, off: off };
+    // Scheduled note for Listen: starts after `delay` s, lasts `dur` s. Returns a handle for stopAll.
+    function play(m, delay, dur) {
+      var a = ctx();
+      if (!a) return null;
+      var f = 440 * Math.pow(2, (m - 69) / 12), t = a.currentTime + Math.max(0, delay), end = t + Math.max(0.08, dur);
+      var o = a.createOscillator(), o2 = a.createOscillator(), g = a.createGain(), g2 = a.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      o2.type = 'sine'; o2.frequency.value = f * 2; g2.gain.value = 0.15;
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(a.destination);
+      g.gain.value = 0;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.2, t + 0.01);
+      g.gain.setTargetAtTime(0.05, t + 0.01, 0.5);   // piano-like decay
+      g.gain.setTargetAtTime(0, end, 0.06);          // release
+      o.start(t); o2.start(t); o.stop(end + 0.5); o2.stop(end + 0.5);
+      return { o: o, o2: o2, g: g };
+    }
+    function stopAll(list) {
+      if (!ac) return;
+      var t = ac.currentTime;
+      list.forEach(function (v) {
+        if (!v) return;
+        try {
+          var g = v.g.gain;
+          if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t); else g.cancelScheduledValues(t);
+          g.setTargetAtTime(0, t, 0.02);
+          v.o.stop(t + 0.15); v.o2.stop(t + 0.15);
+        } catch (e) { /* already stopped */ }
+      });
+    }
+    return { on: on, off: off, play: play, stopAll: stopAll };
   })();
+
+  // ---------------------------------------------------------------- Listen (demo playback)
+  // Plays the practised hand(s) from the current step to the end (or to the loop's end) on the
+  // piano's own sound when it is connected (MIDI out), otherwise with the built-in synth.
+  // The falling notes / score follow along; afterwards you are back where it started.
+  function demoOutput() {
+    if (!settings.listenOnPiano || !midiAccess || !midiAccess.outputs) return null;
+    var inNames = [], same = null, other = null;
+    midiAccess.inputs.forEach(function (i) { if (i.state === 'connected') inNames.push(i.name); });
+    if (!inNames.length) return null;   // no piano connected
+    midiAccess.outputs.forEach(function (o) {
+      if (o.state === 'disconnected') return;
+      if (!same && inNames.indexOf(o.name) >= 0) same = o;                     // the piano itself
+      if (!other && !/wavetable|through|thru/i.test(o.name)) other = o;
+    });
+    return same || other;
+  }
+
+  function demoAt(d, t) { return d.start + (t - d.t0) / d.speed * 1000; }   // song time -> performance.now() ms
+
+  function startDemo() {
+    if (!st.song || !st.steps.length) return;
+    var from = st.idx >= st.steps.length ? (loopOn() ? loop.a : 0) : st.idx;
+    var to = loopOn() && from <= loop.b ? loop.b : st.steps.length - 1;
+    var t0 = st.steps[from].t, t1 = st.steps[to].t + CHORD_TOLERANCE;
+    var notes = st.song.notes.filter(function (n) {
+      return n.t >= t0 - 0.001 && n.t <= t1 && (st.hand === 'B' || n.h === st.hand);
+    });
+    restart(from);   // a fresh start: no mistakes, no half-played chord
+    var d = { from: from, to: to, t0: t0, notes: notes, ni: 0, si: from, speed: +settings.listenSpeed || 1,
+      out: demoOutput(), start: performance.now() + 150, nodes: [], timers: [], sent: {}, timer: 0, endMs: 0 };
+    notes.forEach(function (n) { d.endMs = Math.max(d.endMs, demoAt(d, n.t) + n.d / d.speed * 1000); });
+    demo = d;
+    d.timer = setInterval(demoTick, 25);
+    demoTick();
+    requestWakeLock();
+    showListenToggle(); updateHint();
+  }
+
+  function demoTick() {
+    var d = demo;
+    if (!d) return;
+    var now = performance.now();
+    while (d.ni < d.notes.length && demoAt(d, d.notes[d.ni].t) <= now + 200) {   // schedule 200 ms ahead
+      var n = d.notes[d.ni++], on = demoAt(d, n.t), off = on + Math.max(60, n.d / d.speed * 1000);
+      demoNote(d, n, on, off);
+    }
+    var moved = false;
+    while (d.si <= d.to && demoAt(d, st.steps[d.si].t) <= now) { st.idx = d.si++; moved = true; }
+    if (moved) { st.hits = {}; updateStats(); dirty = true; lastNoteAt = now; }
+    if (d.ni >= d.notes.length && now > d.endMs + 300) stopDemo();
+  }
+
+  function demoNote(d, n, onMs, offMs) {
+    if (d.out) {
+      try {
+        d.out.send([0x90, n.m, 80], onMs);
+        d.out.send([0x80, n.m, 0], offMs);
+        d.sent[n.m] = true;
+      } catch (e) { d.out = null; }   // piano went away: continue with the synth
+    }
+    if (!d.out) d.nodes.push(synth.play(n.m, (onMs - performance.now()) / 1000, (offMs - onMs) / 1000));
+    d.timers.push(setTimeout(function () { demoKeys[n.m] = n.h; dirty = true; }, Math.max(0, onMs - performance.now())));
+    d.timers.push(setTimeout(function () { delete demoKeys[n.m]; dirty = true; }, Math.max(0, offMs - performance.now() - 30)));
+  }
+
+  // Silences the playback without moving the practice position.
+  function endDemo() {
+    var d = demo;
+    if (!d) return;
+    demo = null;
+    clearInterval(d.timer);
+    d.timers.forEach(clearTimeout);
+    demoKeys = {};
+    if (d.out) {
+      var out = d.out;
+      var allOff = function () {
+        try {
+          Object.keys(d.sent).forEach(function (m) { out.send([0x80, +m, 0]); });
+          out.send([0xB0, 123, 0]);   // all notes off
+        } catch (e) { /* unplugged */ }
+      };
+      try { if (out.clear) out.clear(); } catch (e) { /* not supported */ }
+      allOff();
+      setTimeout(allOff, 300);   // notes already queued ahead
+    }
+    synth.stopAll(d.nodes);
+    showListenToggle();
+    updateHint();
+    dirty = true;
+  }
+
+  // Stops the playback and goes back to where it started, ready to play.
+  function stopDemo() {
+    var d = demo;
+    if (!d) return;
+    endDemo();
+    restart(d.from);
+  }
 
   // ---------------------------------------------------------------- canvas: layout
   var cv = $('#stage'), ctx = cv.getContext('2d');
@@ -538,6 +694,7 @@
 
   function keyState(m, now, step) {
     if (wrong[m] && now - wrong[m] < 380) return { fill: '#ff5c5c', strong: true };
+    if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], strong: true };   // sounding in Listen
     if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0) {
       var hand = step.hands[m];
       var on = !!(held[m] || st.hits[m]);
@@ -686,7 +843,7 @@
   });
 
   // ---------------------------------------------------------------- modals
-  function openModal(id) { $('#' + id).classList.add('open'); dirty = true; }
+  function openModal(id) { stopDemo(); $('#' + id).classList.add('open'); dirty = true; }
   function closeModal(id) {
     $('#' + id).classList.remove('open');
     if (id === 'mEditor') setRecording(false);
@@ -698,6 +855,25 @@
 
   document.querySelectorAll('[data-close]').forEach(function (b) {
     b.addEventListener('click', function () { closeModal(b.closest('.modal').id); });
+  });
+
+  // Escape or a tap outside the dialog closes it (the editor asks first if something changed).
+  function editorChanged() {
+    return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? editing.title : '');
+  }
+  function dismissModal(id) {
+    if (id === 'mEditor' && editorChanged() && !confirm('Close the editor without saving?')) return;
+    closeModal(id);
+  }
+  document.querySelectorAll('.modal').forEach(function (m) {
+    var downOutside = false;   // both press and release outside (not a text selection that ended there)
+    m.addEventListener('pointerdown', function (e) { downOutside = e.target === m; });
+    m.addEventListener('click', function (e) { if (e.target === m && downOutside) dismissModal(m.id); });
+  });
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = document.querySelectorAll('.modal.open');
+    if (open.length) { e.preventDefault(); dismissModal(open[open.length - 1].id); }
   });
 
   // ---------------------------------------------------------------- library
@@ -774,16 +950,100 @@
     return new TextDecoder().decode(bytes);
   }
 
-  function shareSong(song) {
-    var url = location.origin + location.pathname + '#song=' + b64urlEncode(JSON.stringify({ t: song.title, s: song.text }));
-    if (navigator.share) { navigator.share({ title: song.title, url: url }).catch(function () { /* cancelled */ }); return; }
+  function shareLink(data, title, what) {
+    var url = location.origin + location.pathname + '#song=' + b64urlEncode(JSON.stringify(data));
+    if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () { /* cancelled */ }); return; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
-        alert('Link copied. Open it on another device to add “' + song.title + '” there.');
+        alert('Link copied. Open it on another device to add ' + what + ' there.');
       }, function () { prompt('Copy this link:', url); });
       return;
     }
     prompt('Copy this link:', url);
+  }
+  function shareSong(song) { shareLink({ t: song.title, s: song.text }, song.title, '“' + song.title + '”'); }
+
+  // Song entries in links and backup files: typed {t, s}, MIDI {t, k: 'midi', n: [[m, t, d, h], ...]},
+  // plus b = best scores {B, R, L} in backup files.
+  function songEntry(s, withBest) {
+    var e = s.kind === 'midi'
+      ? { t: s.title, k: 'midi', n: s.notes.map(function (n) { return [n.m, n.t, n.d, n.h]; }) }
+      : { t: s.title, s: s.text };
+    if (withBest) {
+      var b = {};
+      ['B', 'R', 'L'].forEach(function (h) { if (best[s.id + ':' + h] != null) b[h] = best[s.id + ':' + h]; });
+      if (Object.keys(b).length) e.b = b;
+    }
+    return e;
+  }
+  function entryValid(d) {
+    if (!d || typeof d.t !== 'string') return false;
+    if (d.k === 'midi') {
+      return Array.isArray(d.n) && d.n.length > 0 && d.n.length <= 50000 && d.n.every(function (x) {
+        return Array.isArray(x) && x.length === 4 && typeof x[0] === 'number' && x[0] >= 0 && x[0] <= 127 &&
+          typeof x[1] === 'number' && x[1] >= 0 && typeof x[2] === 'number' && x[2] >= 0 && (x[3] === 'R' || x[3] === 'L');
+      });
+    }
+    return typeof d.s === 'string' && d.s.length <= 20000;
+  }
+
+  // Adds songs from a link or a backup file. Same title + same notes: already there.
+  // Same title + different notes: offer to update it (keeps its best scores). New title: add it.
+  // Returns the song to show (or null).
+  function importSongs(list, damagedMsg, fromBackup) {
+    var valid = Array.isArray(list) && list.length > 0 && list.length <= 500 && list.every(entryValid);
+    if (!valid) { alert(damagedMsg); return null; }
+    var toAdd = [], toUpdate = [], same = [];
+    for (var i = 0; i < list.length; i++) {
+      var d = list[i], isMidi = d.k === 'midi', title = d.t.trim().slice(0, 120) || 'Shared song', notes;
+      if (isMidi) {
+        notes = d.n.map(function (x) { return { m: x[0], t: x[1], d: x[2], h: x[3] }; });
+        sortNotes(notes);
+      } else {
+        var r = parseSongText(d.s);
+        if (r.errors.length || !r.notes.length) { alert('“' + title + '” contains mistakes and can’t be added.'); return null; }
+        notes = r.notes;
+      }
+      var match = songs.filter(function (x) { return x.title === title && (x.kind === 'midi') === isMidi; })[0];
+      var item = { d: d, title: title, notes: notes, isMidi: isMidi, song: match };
+      if (match && (isMidi ? match.notes.length === notes.length : match.text === d.s)) same.push(item);
+      else if (match) toUpdate.push(item);
+      else toAdd.push(item);
+    }
+    function names(arr) {
+      return arr.length > 4 ? arr.length + ' songs' : arr.map(function (x) { return '“' + x.title + '”'; }).join(', ');
+    }
+    function mergeBest(item) {   // keep the better score
+      if (!item.d.b || !item.song) return;
+      ['B', 'R', 'L'].forEach(function (h) {
+        var v = item.d.b[h], k = item.song.id + ':' + h;
+        if (typeof v === 'number' && v >= 0 && v <= 100 && (best[k] == null || v > best[k])) best[k] = v;
+      });
+    }
+    if (toAdd.length || toUpdate.length) {
+      var question = [];
+      if (toAdd.length) question.push('Add ' + names(toAdd) + ' to your songs');
+      if (toUpdate.length) question.push((toAdd.length ? 'update ' : 'Update ') + names(toUpdate) + ' with the version in the ' + (fromBackup ? 'backup' : 'link'));
+      if (!confirm(question.join(' and ') + '?')) return null;
+      var old = toUpdate.map(function (u) { return { text: u.song.text, notes: u.song.notes }; });
+      toUpdate.forEach(function (u) { if (!u.isMidi) u.song.text = u.d.s; u.song.notes = u.notes; });
+      var created = toAdd.map(function (x) {
+        x.song = x.isMidi ? { id: newId(), title: x.title, kind: 'midi', notes: x.notes } : songFromText(x.title, x.d.s);
+        return x.song;
+      });
+      songs = created.concat(songs);
+      if (!saveSongs()) {
+        songs = songs.slice(created.length);
+        toUpdate.forEach(function (u, k) { u.song.text = old[k].text; u.song.notes = old[k].notes; });
+        return null;
+      }
+    } else if (fromBackup) {
+      alert('All songs in this backup are already here.');
+    }
+    same.concat(toUpdate, toAdd).forEach(mergeBest);
+    store.set('pliktra.best', best);
+    var first = toAdd[0] || toUpdate[0] || same[0];
+    return first ? first.song : null;
   }
 
   function importFromHash() {
@@ -793,47 +1053,39 @@
     var data = null;
     try { data = JSON.parse(b64urlDecode(m[1])); } catch (e) { /* handled below */ }
     // A link holds one song {t, s} or a list of them [{t, s}, ...]
-    var list = Array.isArray(data) ? data : [data];
-    var valid = list.length > 0 && list.length <= 50 && list.every(function (d) {
-      return d && typeof d.t === 'string' && typeof d.s === 'string' && d.s.length <= 20000;
-    });
-    if (!valid) { alert('This song link is damaged.'); return false; }
-
-    // Same title + same notes: already there. Same title + different notes: offer to update it
-    // (keeps the song's best scores). New title: add it.
-    var toAdd = [], toUpdate = [], firstExisting = null;
-    for (var i = 0; i < list.length; i++) {
-      var title = list[i].t.trim().slice(0, 120) || 'Shared song', text = list[i].s;
-      var match = songs.filter(function (x) { return x.kind === 'text' && x.title === title; })[0];
-      if (match && match.text === text) { firstExisting = firstExisting || match; continue; }
-      var r = parseSongText(text);
-      if (r.errors.length || !r.notes.length) { alert('“' + title + '” in this link contains mistakes and can’t be added.'); return false; }
-      if (match) toUpdate.push({ song: match, text: text });
-      else toAdd.push({ title: title, text: text });
-    }
-    if (!toAdd.length && !toUpdate.length) {
-      if (firstExisting) { closeAll(); loadSong(firstExisting); return true; }
-      return false;
-    }
-    function names(arr) { return arr.map(function (t) { return '“' + t + '”'; }).join(', '); }
-    var question = [];
-    if (toAdd.length) question.push('Add ' + names(toAdd.map(function (x) { return x.title; })) + ' to your songs');
-    if (toUpdate.length) question.push((toAdd.length ? 'update ' : 'Update ') + names(toUpdate.map(function (u) { return u.song.title; })) + ' with the new version');
-    if (!confirm(question.join(' and ') + '?')) return false;
-
-    var oldTexts = toUpdate.map(function (u) { return u.song.text; });
-    toUpdate.forEach(function (u) { u.song.text = u.text; u.song.notes = parseSongText(u.text).notes; });
-    var created = toAdd.map(function (x) { return songFromText(x.title, x.text); });
-    songs = created.concat(songs);
-    if (!saveSongs()) {
-      songs = songs.slice(created.length);
-      toUpdate.forEach(function (u, k) { u.song.text = oldTexts[k]; u.song.notes = parseSongText(oldTexts[k]).notes; });
-      return false;
-    }
+    var song = importSongs(Array.isArray(data) ? data : data ? [data] : null, 'This song link is damaged.', false);
+    if (!song) return false;
     closeAll();
-    loadSong(created[0] || toUpdate[0].song);
+    loadSong(song);
     return true;
   }
+
+  // ---- all songs: share link (typed songs), backup file (everything, with best scores), restore
+  $('#btnShareAll').onclick = function () {
+    var typed = songs.filter(function (s) { return s.kind !== 'midi'; });
+    if (!typed.length) { alert('There are no typed songs to share yet.'); return; }
+    shareLink(typed.map(function (s) { return songEntry(s, false); }), 'Pliktra songs',
+      typed.length === 1 ? '“' + typed[0].title + '”' : 'these ' + typed.length + ' songs');
+  };
+  $('#btnBackup').onclick = function () {
+    var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }) };
+    var a = el('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+    a.download = 'pliktra-songs-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+  };
+  $('#fileRestore').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    f.text().then(function (txt) {
+      var data = null;
+      try { data = JSON.parse(txt); } catch (err) { /* handled below */ }
+      importSongs(data && data.app === 'pliktra' ? data.songs : null, 'This is not a Pliktra backup file, or it is damaged.', true);
+      renderLibrary();
+    });
+  });
   window.addEventListener('hashchange', importFromHash);
 
   // ---------------------------------------------------------------- editor
@@ -979,11 +1231,41 @@
   bindSetting('setLaneLabels', 'laneLabels', true);
   bindSetting('setRange', 'range');
   bindSetting('setSound', 'sound', true);
+  bindSetting('setListenSpeed', 'listenSpeed');
+  bindSetting('setListenOnPiano', 'listenOnPiano', true);
 
   // ---------------------------------------------------------------- top bar wiring
   $('#btnSongs').onclick = function () { renderLibrary(); openModal('mLibrary'); };
   $('#btnSettings').onclick = function () { openModal('mSettings'); };
-  $('#btnRestart').onclick = function () { restart(0); };
+  $('#btnRestart').onclick = function () { restart(loopOn() ? loop.a : 0); };
+
+  function showListenToggle() {
+    var b = $('#btnListen');
+    b.classList.toggle('on', !!demo);
+    b.setAttribute('aria-pressed', demo ? 'true' : 'false');
+    b.querySelector('.ico').textContent = demo ? '■' : '▶︎';
+    b.querySelector('.lbl').textContent = demo ? ' Stop' : ' Listen';
+  }
+  $('#btnListen').onclick = function () { if (demo) stopDemo(); else startDemo(); };
+
+  function showLoopToggle() {
+    var b = $('#btnLoop');
+    b.classList.toggle('on', loopOn());
+    b.classList.toggle('pending', loop.pending);
+    b.setAttribute('aria-pressed', loopOn() ? 'true' : 'false');
+    b.querySelector('.lbl').textContent = loop.pending ? ' Set end' : loopOn() ? ' Loop ' + (loop.a + 1) + '–' + (loop.b + 1) : ' Loop';
+  }
+  // Loop: 1st tap = start here, 2nd tap = end here (after moving the slider or playing on), 3rd tap = off.
+  $('#btnLoop').onclick = function () {
+    if (!st.steps.length) return;
+    if (loopOn()) { clearLoop(); updateStats(); updateHint(); return; }
+    var here = Math.min(st.idx, st.steps.length - 1);
+    if (!loop.pending) { endDemo(); loop.pending = true; loop.a = here; showLoopToggle(); updateHint(); return; }
+    var a = Math.min(loop.a, here), b = Math.max(loop.a, here);
+    loop.pending = false; loop.a = a; loop.b = b; loop.laps = 0;
+    showLoopToggle();
+    restart(a);
+  };
   function showFingerToggle() {
     var b = $('#btnFingers');
     b.classList.toggle('on', !!settings.fingers);
@@ -1038,7 +1320,7 @@
   function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock = null; } }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && st.startTime && !st.finished) requestWakeLock();
-    if (document.visibilityState === 'hidden') releaseMidiNotes();
+    if (document.visibilityState === 'hidden') { releaseMidiNotes(); stopDemo(); }
   });
   // Let the screen sleep again after 3 minutes without playing.
   setInterval(function () {
@@ -1053,4 +1335,8 @@
   if (!importFromHash()) loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || songs[0] || null);
   initMidi();
   requestAnimationFrame(frame);
+  // Offline use / install as an app (only on the website: service workers need https).
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* offline mode not available */ });
+  }
 })();

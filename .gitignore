@@ -3,3 +3,8 @@
 *.jpeg
 *.png
 *.heic
+# ...except the app's own icons
+!icons/*.png
+
+# song backups (may contain copyrighted songs)
+pliktra-songs-*.json

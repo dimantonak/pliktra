@@ -95,6 +95,9 @@ body {
 .btn.toggle { color: var(--muted); }
 .btn.toggle.on { background: rgba(79, 157, 255, .18); border-color: var(--accent); color: var(--text); }
 .btn.rec.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.toggle.pending { border: 1px dashed var(--accent); color: var(--text); }
+
+.backup { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 
 .seg {
   display: inline-flex;
@@ -227,6 +230,7 @@ table.parts { width: 100%; border-collapse: collapse; }
 
 @media (max-width: 900px) {
   .practicebar .lbl { display: none; }
+  .practicebar .btn.pending .lbl { display: inline; }   /* "Set end" must be readable */
   .practicebar .btn { padding: 0 12px; }
 }
 
@@ -234,4 +238,13 @@ table.parts { width: 100%; border-collapse: collapse; }
   .held, #stepCount { display: none; }
   .bar { gap: 6px; padding: 6px 8px; }
   .seg button { padding: 0 10px; }
+}
+
+@media (max-width: 560px) {   /* phone held upright: slider and mistakes on their own row */
+  .practicebar { flex-wrap: wrap; }
+  .practicebar .btn { padding: 0 9px; }
+  .seg button { padding: 0 8px; }
+  #progress { order: 10; flex: 1 1 150px; }
+  #mistakes { order: 11; }
+  .pill { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
 }

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14171c">
   <title>Pliktra</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,6 +26,8 @@
     <button id="btnRestart" class="btn" title="Restart">&#8634;<span class="lbl"> Restart</span></button>
     <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key">&#9995;<span class="lbl"> Fingers</span></button>
     <button id="btnView" class="btn toggle" aria-pressed="false" title="Show sheet music instead of falling notes">&#9835;<span class="lbl"> Sheet</span></button>
+    <button id="btnListen" class="btn toggle" aria-pressed="false" title="Listen to the song first"><span class="ico">&#9654;&#xFE0E;</span><span class="lbl"> Listen</span></button>
+    <button id="btnLoop" class="btn toggle" aria-pressed="false" title="Repeat a part: tap at its start, move to its end, tap again">&#10227;<span class="lbl"> Loop</span></button>
     <input type="range" id="progress" min="0" max="0" value="0" aria-label="Position in song">
     <span id="stepCount" class="stat">0 / 0</span>
     <span id="mistakes" class="stat">Mistakes 0</span>
@@ -39,20 +44,28 @@
 
   <!-- Song library -->
   <div class="modal" id="mLibrary">
-    <div class="sheet">
-      <div class="sheet-head"><h2>Songs</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mLibraryTitle">
+      <div class="sheet-head"><h2 id="mLibraryTitle">Songs</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
       <div class="row gap">
         <button id="btnNew" class="btn primary">+ New song</button>
         <label class="btn">Import MIDI file<input type="file" id="fileMidi" accept=".mid,.midi,audio/midi,audio/x-midi" hidden></label>
       </div>
       <ul id="songList" class="songlist"></ul>
+      <div class="backup">
+        <p class="muted small">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
+        <div class="row gap">
+          <button id="btnShareAll" class="btn small">Share all songs</button>
+          <button id="btnBackup" class="btn small">Save backup file</button>
+          <label class="btn small">Restore backup<input type="file" id="fileRestore" accept=".json,application/json" hidden></label>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Song editor -->
   <div class="modal" id="mEditor">
-    <div class="sheet wide">
-      <div class="sheet-head"><h2>Song editor</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+    <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="mEditorTitle">
+      <div class="sheet-head"><h2 id="mEditorTitle">Song editor</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
       <label class="field">Title<input id="edTitle" type="text" placeholder="e.g. Ode to Joy"></label>
       <label class="field">Notes<textarea id="edText" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="C4 D4 E4 F4 G4_2"></textarea></label>
       <div class="row gap">
@@ -69,7 +82,8 @@
           <li>Keys played together (chord): join with <code>+</code>, e.g. <code>C4+E4+G4</code>.</li>
           <li>Hands: notes below middle C go to the left hand, the rest to the right. Force a hand with <code>L:</code> or <code>R:</code>, e.g. <code>L:C4+R:E4</code>.</li>
           <li>Fingers: add <code>/</code> and the finger after a note: <code>E4/3</code>, <code>G3/4+B3/2</code>. 1 = thumb, 2 = index, 3 = middle, 4 = ring, 5 = little finger (same numbers for both hands).</li>
-          <li>Length in beats (only changes the spacing on screen): <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat. <code>-</code> is a rest.</li>
+          <li>Length in beats: <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat (1 beat = a quarter note). <code>-</code> is a rest, <code>-_2</code> a 2-beat rest.</li>
+          <li>Time signature: write it first, e.g. <code>3/4</code> or <code>6/8</code> (default 4/4). It sets the bars in the sheet music.</li>
           <li>Bar lines <code>|</code> and anything after <code>//</code> are ignored.</li>
           <li><b>Record from piano</b> adds what you play on the piano to the end of the text.</li>
         </ul>
@@ -83,8 +97,8 @@
 
   <!-- MIDI import -->
   <div class="modal" id="mImport">
-    <div class="sheet wide">
-      <div class="sheet-head"><h2>Import MIDI file</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+    <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="mImportTitle">
+      <div class="sheet-head"><h2 id="mImportTitle">Import MIDI file</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
       <label class="field">Title<input id="imTitle" type="text"></label>
       <p class="muted">Choose which hand plays each part of the file.</p>
       <table class="parts">
@@ -100,8 +114,8 @@
 
   <!-- Result -->
   <div class="modal" id="mResult">
-    <div class="sheet">
-      <div class="sheet-head"><h2>Well done!</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mResultTitle">
+      <div class="sheet-head"><h2 id="mResultTitle">Well done!</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
       <div id="resBody"></div>
       <div class="row end gap">
         <button id="btnResSongs" class="btn">Songs</button>
@@ -112,8 +126,8 @@
 
   <!-- Settings -->
   <div class="modal" id="mSettings">
-    <div class="sheet">
-      <div class="sheet-head"><h2>Settings</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mSettingsTitle">
+      <div class="sheet-head"><h2 id="mSettingsTitle">Settings</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
       <label class="field">Note names on the keyboard
         <select id="setLabels">
           <option value="off">Off</option>
@@ -129,6 +143,14 @@
         </select>
       </label>
       <label class="check"><input type="checkbox" id="setSound"> Sound when tapping the screen keys</label>
+      <label class="field">Listen speed
+        <select id="setListenSpeed">
+          <option value="1">Normal</option>
+          <option value="0.75">Slower (75%)</option>
+          <option value="0.5">Slow (50%)</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="setListenOnPiano"> Listen on the piano’s own sound when it is connected</label>
       <p class="muted small">Without a piano you can also play with the computer keyboard: A W S E D F T G Y H U J K = C to C, Z / X = octave down / up.</p>
     </div>
   </div>
