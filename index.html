@@ -128,30 +128,60 @@
   <div class="modal" id="mSettings">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mSettingsTitle">
       <div class="sheet-head"><h2 id="mSettingsTitle">Settings</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
-      <label class="field">Note names on the keyboard
-        <select id="setLabels">
-          <option value="off">Off</option>
-          <option value="C">Only C keys (C3, C4&hellip;)</option>
-          <option value="all">All white keys</option>
-        </select>
-      </label>
-      <label class="check"><input type="checkbox" id="setLaneLabels"> Note names on the falling notes</label>
-      <label class="field">Keyboard size
-        <select id="setRange">
-          <option value="fit">Fit to the song (bigger keys)</option>
-          <option value="full">All 88 keys</option>
-        </select>
-      </label>
-      <label class="check"><input type="checkbox" id="setSound"> Sound when tapping the screen keys</label>
-      <label class="field">Listen speed
-        <select id="setListenSpeed">
-          <option value="1">Normal</option>
-          <option value="0.75">Slower (75%)</option>
-          <option value="0.5">Slow (50%)</option>
-        </select>
-      </label>
-      <label class="check"><input type="checkbox" id="setListenOnPiano"> Listen on the piano’s own sound when it is connected</label>
-      <p class="muted small">Without a piano you can also play with the computer keyboard: A W S E D F T G Y H U J K = C to C, Z / X = octave down / up.</p>
+      <section class="set-group">
+        <h3>Keyboard on the screen</h3>
+        <label class="field">Note names on the keys
+          <select id="setLabels">
+            <option value="all">All white keys</option>
+            <option value="C">Only C keys (C3, C4&hellip;)</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label class="field">Size
+          <select id="setRange">
+            <option value="fit">Fit to the song (bigger keys)</option>
+            <option value="full">All 88 keys</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="set-group">
+        <h3>Falling notes view</h3>
+        <label class="check"><input type="checkbox" id="setLaneLabels"> Note names on the falling notes</label>
+        <p class="muted small">Switch between sheet music and falling notes with the &#9835; Sheet button.</p>
+      </section>
+
+      <section class="set-group">
+        <h3>Listen</h3>
+        <label class="field">Speed
+          <select id="setListenSpeed">
+            <option value="1">Normal</option>
+            <option value="0.75">Slower (75%)</option>
+            <option value="0.5">Slow (50%)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="setListenOnPiano"> Play on the piano’s own sound when it is connected</label>
+      </section>
+
+      <section class="set-group">
+        <h3>Without a piano</h3>
+        <label class="check"><input type="checkbox" id="setSound"> Sound when tapping the screen keys</label>
+        <p class="muted small">You can also play with a computer keyboard: A W S E D F T G Y H U J K = C to C, Z / X = octave down / up.</p>
+      </section>
+
+      <details class="help">
+        <summary>What the buttons do</summary>
+        <ul>
+          <li><b>Both / Right / Left</b> &ndash; practise both hands or one hand. The other hand’s notes are then not counted as mistakes.</li>
+          <li><b>&#8634; Restart</b> &ndash; start again from the beginning (or from the start of the loop).</li>
+          <li><b>&#9995; Fingers</b> &ndash; show or hide finger numbers (1 = thumb &hellip; 5 = little finger).</li>
+          <li><b>&#9835; Sheet</b> &ndash; sheet music (lit) or falling notes. Imported MIDI files always use falling notes.</li>
+          <li><b>&#9654;&#xFE0E; Listen</b> &ndash; hear the song from where you are; tap &#9632; to stop and play it yourself.</li>
+          <li><b>&#10227; Loop</b> &ndash; repeat a hard part: tap at its first note, move the slider (or play on) to its last note, tap <i>Set end</i>. Tap Loop again to stop.</li>
+          <li><b>Slider</b> &ndash; start from any point in the song.</li>
+          <li><b>&#9776; Songs</b> &ndash; choose, add, edit, share and back up songs.</li>
+        </ul>
+      </details>
     </div>
   </div>
 
