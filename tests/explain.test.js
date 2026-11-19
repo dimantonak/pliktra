@@ -61,6 +61,8 @@ for (const lang of Object.keys(L.LANGS)) {
       { type: 'bar', final: true }, { type: 'brace' }]) complete(Explain.card(info, [3, 4]));
     for (const key of ['G', 'F', 'D', 'Bb', 'Em', 'F#m', 'C#', 'Cb']) complete(Explain.card({ type: 'key' }, [4, 4], key));
     complete(Explain.card({ type: 'time' }, [3, 16]));
+    complete(Explain.card({ type: 'bar', pickup: true, len: 1 }, [3, 4]));
+    complete(Explain.card({ type: 'bar', pickup: true, len: 0.5 }, [3, 8]));
     complete(Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 66 }, { m: 70, s: 'Bb4' }], acc: {} }, [4, 4], 'G'));
     complete(Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 65 }], acc: {} }, [4, 4], 'G'));
     for (const g of Explain.glossary()) complete({ title: g.title, lines: [g.text] });
@@ -109,7 +111,15 @@ test('what a card says', () => {
   assert.ok(fnLater.lines.some(l => l.startsWith('No sign in front of it')));
   assert.ok(Explain.card({ type: 'time' }, [3, 16]).lines.includes('Bottom number 16: a sixteenth note is one beat.'));
 
+  // pickup
+  const pu = Explain.card({ type: 'bar', pickup: true, len: 1 }, [3, 4]);
+  assert.equal(pu.title, 'Pickup (upbeat)');
+  assert.ok(pu.lines.includes('The music starts before the first full bar: this bar has only 1 of its 3 beats.'), pu.lines.join(' | '));
+  assert.ok(pu.lines.includes('Count 1 2 3 and start playing on 3.'));
+  assert.ok(Explain.card({ type: 'bar', pickup: true, len: 0.5 }, [3, 8]).lines.includes('Count 1 2 3 and start playing on 3.'));   // 3/8: one eighth
+
   L.setLang('de');
+  assert.equal(Explain.card({ type: 'bar', pickup: true, len: 1 }, [3, 4]).title, 'Auftakt');
   assert.equal(Explain.card({ type: 'key' }, [4, 4], 'F#m').title, 'Vorzeichen: fis-Moll');
   assert.ok(Explain.card({ type: 'key' }, [4, 4], 'F').lines.includes('1 ♭ direkt nach dem Schlüssel: spiele H als B.'));
   const de = Explain.card({ type: 'note', dur: 'h', len: 2, hand: 'L', first: true, notes: [{ m: 59, s: 'B3', f: 1 }], acc: {} }, [4, 4]);

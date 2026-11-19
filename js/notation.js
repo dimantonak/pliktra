@@ -89,9 +89,10 @@ function offKeyNotes(notes, key) {
 //   -  -_2            rest
 //   3/4               time signature (only at the start; default 4/4)
 //   key:G  key:2b     key signature (only at the start; only changes how the sheet music looks)
+//   pickup:1          pickup (upbeat): the music starts that many beats before the first bar line
 //   |  and  // comments are ignored
 function parseSongText(text) {
-  var notes = [], errors = [], rests = [], meter = [4, 4], key = 'C', beat = 0, steps = 0;
+  var notes = [], errors = [], rests = [], meter = [4, 4], key = 'C', pickup = 0, pickupTok = '', beat = 0, steps = 0;
   var lines = String(text || '').split(/\r?\n/);
   for (var li = 0; li < lines.length; li++) {
     var clean = lines[li].replace(/\/\/.*$/, '');
@@ -112,6 +113,12 @@ function parseSongText(text) {
         if (beat > 0) errors.push(msg('errMeterPos', tok, 'a time signature can only be at the start'));
         else if (!(+tm[1] > 0) || [2, 4, 8, 16].indexOf(+tm[2]) < 0) errors.push(msg('errMeter', tok, 'is not a time signature'));
         else meter = [+tm[1], +tm[2]];
+        continue;
+      }
+      var pm = /^pickup:(.*)$/i.exec(body);                    // pickup, e.g. pickup:1
+      if (pm) {
+        if (beat > 0 || !/^(\d+\.?\d*|\.\d+)$/.test(pm[1]) || !(+pm[1] > 0)) errors.push(msg('errPickup', tok, 'write the pickup at the start, in beats: e.g. pickup:1'));
+        else { pickup = +pm[1]; pickupTok = tok; }
         continue;
       }
       var km = /^key:(.*)$/i.exec(body);                       // key signature, e.g. key:G
@@ -153,9 +160,13 @@ function parseSongText(text) {
     }
   }
   sortNotes(notes);
+  if (pickup && pickup >= meter[0] * 4 / meter[1] - 1e-6) {   // must be shorter than a bar
+    errors.push(msg('errPickupLong', pickupTok, 'the pickup must be shorter than one bar'));
+    pickup = 0;
+  }
   // rests: times (s) of "-" tokens; meter: [beats, unit]; key: e.g. "G" ("C" = none);
-  // beats: total length in quarter-note beats
-  return { notes: notes, errors: errors, steps: steps, rests: rests, meter: meter, key: key, beats: beat };
+  // pickup: length of the first, incomplete bar (0 = none); beats: total length; both in quarter-note beats
+  return { notes: notes, errors: errors, steps: steps, rests: rests, meter: meter, key: key, pickup: pickup, beats: beat };
 }
 
 // Keeps the spelling of flats as written ("Bb3" stays "Bb3" instead of "A#3"), and of E# and B#

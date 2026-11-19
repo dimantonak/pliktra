@@ -60,6 +60,16 @@ test('key signature: only changes how the music is written', () => {
   assert.equal(N.spelled('F#4'), null);
 });
 
+test('pickup', () => {
+  assert.equal(N.parseSongText('3/4 pickup:1 C4 | D4 E4 F4').pickup, 1);
+  assert.equal(N.parseSongText('C4').pickup, 0);
+  assert.equal(N.parseSongText('C4 pickup:1').errors.length, 1);       // only at the start
+  assert.equal(N.parseSongText('pickup:x C4').errors.length, 1);
+  const long = N.parseSongText('3/4 pickup:3 C4');                     // not shorter than a bar
+  assert.equal(long.errors.length, 1);
+  assert.equal(long.pickup, 0);
+});
+
 test('lengths must be numbers', () => {
   assert.equal(N.parseSongText('C4_2abc').errors.length, 1);
   assert.equal(N.parseSongText('C4_2_3').errors.length, 1);

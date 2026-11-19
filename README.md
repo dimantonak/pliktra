@@ -30,6 +30,11 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
   music shows the ♯/♭ once after the clef, like a printed book. Notes are still written as they are played
   (in G major every F is `F#`); the editor points out notes that don't match the key signature,
   which is often a forgotten ♯ or ♭.
+- **Pickup (upbeat)**: if the music starts before the first full bar, write e.g. `pickup:1` at the start;
+  the sheet music then begins with a short bar.
+- **Starter songs** (public domain, simple arrangements written for Pliktra): C major scale, Ode to Joy,
+  Twinkle Twinkle, Jingle Bells, Happy Birthday, Frère Jacques, Row Row Row Your Boat,
+  Minuet in G (Petzold) and the opening of Für Elise.
 - **Record from piano**: in the editor, press *Record from piano* and play; notes are typed for you.
 - **MIDI files** (`.mid`): import from the Songs screen and choose which hand plays each part.
 - **Song list**: tap a song to practise it; the songs you played most recently are at the top.

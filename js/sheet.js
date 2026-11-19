@@ -40,12 +40,21 @@ var Sheet = (function () {
   }
 
   // Parsed song -> bars; each bar has, per hand, a list of notes/chords/rests in order.
+  // With a pickup the first bar is short (bar.pickup), and so is the last one if the music
+  // ends that much early, as in printed music.
   function layoutBars(p) {
-    var barLen = p.meter[0] * 4 / p.meter[1];
-    var nBars = Math.max(1, Math.ceil(Math.max(p.beats, barLen) / barLen - EPS));
+    var barLen = p.meter[0] * 4 / p.meter[1], pick = p.pickup || 0;
     var rests = p.rests.map(function (t) { return snap(t / BEAT_SEC); });
     var bars = [];
-    for (var i = 0; i < nBars; i++) bars.push({ start: i * barLen, R: [], L: [] });
+    if (pick) bars.push({ start: 0, len: pick, pickup: true, R: [], L: [] });
+    var body = p.beats - pick, nBars = Math.max(1, Math.ceil(Math.max(body, pick ? EPS : barLen) / barLen - EPS));
+    for (var i = 0; i < nBars; i++) bars.push({ start: pick + i * barLen, len: barLen, R: [], L: [] });
+    var lastLen = body - (nBars - 1) * barLen;
+    if (pick && Math.abs(lastLen - (barLen - pick)) < EPS) bars[bars.length - 1].len = lastLen;
+    function barEnd(b) {
+      for (var k = 0; k < bars.length; k++) if (b < bars[k].start + bars[k].len - EPS) return bars[k].start + bars[k].len;
+      return bars[bars.length - 1].start + bars[bars.length - 1].len;
+    }
 
     ['R', 'L'].forEach(function (h) {
       var chords = [];
@@ -57,7 +66,7 @@ var Sheet = (function () {
         } else chords.push({ b: b, notes: [n] });
       });
       chords.forEach(function (c, k) {
-        var end = (Math.floor(c.b / barLen + EPS) + 1) * barLen;            // bar line
+        var end = barEnd(c.b);                                               // bar line
         if (chords[k + 1]) end = Math.min(end, chords[k + 1].b);            // next note, same hand
         for (var r = 0; r < rests.length; r++) {                            // next rest
           if (rests[r] > c.b + EPS) { end = Math.min(end, rests[r]); break; }
@@ -67,8 +76,8 @@ var Sheet = (function () {
 
       var ci = 0;
       bars.forEach(function (bar) {
-        var cursor = bar.start, barEnd = bar.start + barLen, items = bar[h];
-        while (ci < chords.length && chords[ci].b < barEnd - EPS) {
+        var cursor = bar.start, endB = bar.start + bar.len, items = bar[h];
+        while (ci < chords.length && chords[ci].b < endB - EPS) {
           var c = chords[ci++];
           if (c.b > cursor + EPS) pushRests(items, cursor, c.b - cursor);
           var parts = splitLength(c.len), b = c.b;
@@ -79,11 +88,11 @@ var Sheet = (function () {
           });
           cursor = c.b + c.len;
         }
-        if (cursor <= bar.start + EPS) items.push({ rest: true, whole: true, b: bar.start, len: barLen, dur: 'w' });
-        else if (cursor < barEnd - EPS) pushRests(items, cursor, barEnd - cursor);
+        if (cursor <= bar.start + EPS && Math.abs(bar.len - barLen) < EPS) items.push({ rest: true, whole: true, b: bar.start, len: barLen, dur: 'w' });
+        else if (cursor < endB - EPS) pushRests(items, cursor, endB - cursor);
       });
     });
-    return { bars: bars, meter: p.meter, key: p.key || 'C' };
+    return { bars: bars, meter: p.meter, key: p.key || 'C', pickup: pick };
   }
 
   function vfKey(n) {
@@ -183,7 +192,8 @@ var Sheet = (function () {
         });
         hits.push({ x: x - 15, y: sT.getYForLine(0), w: 14, h: sB.getYForLine(4) - sT.getYForLine(0), info: { type: 'brace' } });
       }
-      hits.push({ x: x + w - 5, y: sT.getYForLine(0), w: 10, h: sB.getYForLine(4) - sT.getYForLine(0), info: { type: 'bar', final: i === last } });
+      hits.push({ x: x + w - 5, y: sT.getYForLine(0), w: 10, h: sB.getYForLine(4) - sT.getYForLine(0),
+        info: { type: 'bar', final: i === last, pickup: !!bar.pickup, len: bar.len } });
       new VF.StaveConnector(sT, sB).setType(i === last ? 'boldDoubleRight' : 'singleRight').setContext(ctx).draw();
 
       var voices = [], extras = [], fingerJobs = [], noteJobs = [];

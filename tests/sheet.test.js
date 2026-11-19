@@ -26,6 +26,8 @@ const EXTRA = [
   ['2/4 with a whole-bar rest', '2/4 C4 | -_2'],
   ['6/8', '6/8 C4_0.5 D4_0.5 E4_0.5 F4_1.5 | G4_3'],
   ['key signature', 'key:Bb 3/4 Bb3+D4 F4 Eb4 | E4_3'],
+  ['pickup, last bar not shortened', '3/4 pickup:1 G4 | C3+C4_2 E4 | D4'],
+  ['pickup of half a beat in 3/8', '3/8 pickup:0.5 E5_0.25 D#5_0.25 | A2+A4_0.25 E3_0.25 A3_0.25 C4_0.25 E4_0.25 A4_0.25 | A4_1'],
   ['dotted notes and rests, both hands', 'C3+E4_1.5 D4_0.5 C3+E4 F4 | G3+G4_0.75 F4_0.25 E3+E4_3 | C4_0.5 -_1.5 D4_2']
 ];
 
@@ -47,9 +49,14 @@ for (const [title, text] of builtinSongs().concat(EXTRA)) {
     assert.equal(p.errors.length, 0, p.errors.join('; '));
     const lay = Sheet.layoutBars(p);
     const barLen = p.meter[0] * 4 / p.meter[1];
+    lay.bars.forEach((bar, i) => {   // only a pickup bar and the matching last bar may be short
+      const ok = Math.abs(bar.len - barLen) < 1e-6 || (p.pickup && (i === 0 ? Math.abs(bar.len - p.pickup) < 1e-6
+        : i === lay.bars.length - 1 && Math.abs(bar.len - (barLen - p.pickup)) < 1e-6));
+      assert.ok(ok, `bar ${i + 1} is ${bar.len} beats long`);
+    });
     lay.bars.forEach((bar, i) => ['R', 'L'].forEach(h => {
       const sum = bar[h].reduce((a, it) => a + it.len, 0);
-      assert.ok(Math.abs(sum - barLen) < 1e-6, `bar ${i + 1} ${h}: ${sum} beats instead of ${barLen}`);
+      assert.ok(Math.abs(sum - bar.len) < 1e-6, `bar ${i + 1} ${h}: ${sum} beats instead of ${bar.len}`);
       let pos = bar.start;
       bar[h].forEach(it => { assert.ok(Math.abs(it.b - pos) < 1e-6, `bar ${i + 1} ${h}: gap or overlap at ${it.b}`); pos += it.len; });
       bar[h].forEach(it => {

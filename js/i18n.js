@@ -118,6 +118,11 @@ var I18N = {
     keyOrderSharp: 'The ♯ always come in this order: F♯ C♯ G♯ D♯ A♯ E♯ B♯.',
     keyOrderFlat: 'The ♭ always come in this order: B♭ E♭ A♭ D♭ G♭ C♭ F♭.',
     keyGloss: '♯ or ♭ right after the clef count for the whole piece, in every octave. Here: every F is played as F♯ (G major).',
+    pickupT: 'Pickup (upbeat)',
+    pickupInfo: 'The music starts before the first full bar: this bar has only {n} of its {m} beats.',
+    pickupCount: 'Count {c} and start playing on {s}.',
+    pickupEnd: 'The last bar is usually short by the same amount, so together they make one full bar.',
+    pickupGloss: 'A short first bar: the music starts before the first full bar (here on beat 3 of 3/4).',
     keyCheck: 'Not as in the key signature ({k}): {list}. The sheet music shows a ♯, ♭ or ♮ in front of them – check them against your book.',
     barT: 'Bar line',
     barInfo: 'Divides the music into bars of {n} beats each.',
@@ -165,12 +170,14 @@ var I18N = {
       '<li>Length in beats: <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat (1 beat = a quarter note). <code>-</code> is a rest, <code>-_2</code> a 2-beat rest.</li>' +
       '<li>Time signature: write it first, e.g. <code>3/4</code> or <code>6/8</code> (default 4/4). It sets the bars in the sheet music.</li>' +
       '<li>Key signature: also at the start, e.g. <code>key:G</code> (1 ♯), <code>key:F</code> (1 ♭), or by number: <code>key:2#</code>, <code>key:3b</code>. The sheet music then shows the ♯/♭ once after the clef, like your book. Still write every note as it is played: in G major, every F is <code>F#</code>.</li>' +
+      '<li>Pickup (upbeat): if the music starts before the first full bar, write its length at the start, e.g. <code>pickup:1</code> (in beats, like <code>_</code>).</li>' +
       '<li>Bar lines <code>|</code> and anything after <code>//</code> are ignored.</li>' +
       '<li><b>Record from piano</b> adds what you play on the piano to the end of the text.</li>',
     // parser errors
     errLength: '"{tok}": the length after _ must be a number', errMeterPos: '"{tok}": a time signature can only be at the start',
     errMeter: '"{tok}" is not a time signature', errKeyPos: '"{tok}": a key signature can only be at the start',
-    errKey: '"{tok}" is not a key signature (e.g. key:G, key:F, key:2#)', errFinger: '"{tok}": the finger after / must be 1 to 5', errNote: '"{tok}" is not a note on the piano',
+    errKey: '"{tok}" is not a key signature (e.g. key:G, key:F, key:2#)',
+    errPickup: '"{tok}": write the pickup at the start, in beats: e.g. pickup:1', errPickupLong: '"{tok}": the pickup must be shorter than one bar', errFinger: '"{tok}": the finger after / must be 1 to 5', errNote: '"{tok}" is not a note on the piano',
     // MIDI import
     importTitle: 'Import MIDI file', importHelp: 'Choose which hand plays each part of the file.',
     part: 'Part', range: 'Range', hand: 'Hand', rightHand: 'Right hand', leftHand: 'Left hand', split: 'Split at middle C', skip: 'Skip',
@@ -307,6 +314,11 @@ var I18N = {
     keyOrderSharp: 'Die ♯ kommen immer in dieser Reihenfolge: Fis Cis Gis Dis Ais Eis His.',
     keyOrderFlat: 'Die ♭ kommen immer in dieser Reihenfolge: B Es As Des Ges Ces Fes.',
     keyGloss: '♯ oder ♭ direkt nach dem Schlüssel gelten für das ganze Stück, in jeder Oktave. Hier: jedes F wird als Fis gespielt (G-Dur).',
+    pickupT: 'Auftakt',
+    pickupInfo: 'Die Musik beginnt vor dem ersten vollen Takt: dieser Takt hat nur {n} von {m} Schlägen.',
+    pickupCount: 'Zähle {c} und fang auf {s} an zu spielen.',
+    pickupEnd: 'Der letzte Takt ist meist um genauso viel kürzer, zusammen ergeben sie einen ganzen Takt.',
+    pickupGloss: 'Ein kurzer erster Takt: die Musik beginnt vor dem ersten vollen Takt (hier auf Schlag 3 im 3/4-Takt).',
     keyCheck: 'Anders als die Vorzeichen ({k}): {list}. Die Noten zeigen davor ein ♯, ♭ oder ♮ – vergleiche sie mit deinem Buch.',
     barT: 'Taktstrich',
     barInfo: 'Teilt die Musik in Takte mit je {n} Schlägen.',
@@ -353,11 +365,13 @@ var I18N = {
       '<li>Länge in Schlägen: <code>C4_2</code> = 2 Schläge, <code>G4_0.5</code> = ein halber Schlag (1 Schlag = eine Viertelnote). <code>-</code> ist eine Pause, <code>-_2</code> eine Pause von 2 Schlägen.</li>' +
       '<li>Taktart: zuerst schreiben, z. B. <code>3/4</code> oder <code>6/8</code> (sonst 4/4). Sie bestimmt die Takte in den Noten.</li>' +
       '<li>Vorzeichen: auch am Anfang, z. B. <code>key:G</code> (1 ♯, G-Dur), <code>key:F</code> (1 ♭, F-Dur), <code>key:Bb</code> (B-Dur) oder nach Anzahl: <code>key:2#</code>, <code>key:3b</code>. Die Noten zeigen die ♯/♭ dann einmal nach dem Schlüssel, wie im Buch. Trotzdem jede Note so schreiben, wie sie gespielt wird: in G-Dur ist jedes F ein <code>F#</code> (Fis).</li>' +
+      '<li>Auftakt: beginnt die Musik vor dem ersten vollen Takt, am Anfang seine Länge schreiben, z. B. <code>pickup:1</code> (in Schlägen, wie bei <code>_</code>).</li>' +
       '<li>Taktstriche <code>|</code> und alles nach <code>//</code> werden ignoriert.</li>' +
       '<li><b>Vom Klavier aufnehmen</b> fügt das, was du auf dem Klavier spielst, am Ende des Textes an.</li>',
     errLength: '„{tok}“: nach _ muss eine Zahl stehen', errMeterPos: '„{tok}“: eine Taktart darf nur am Anfang stehen',
     errMeter: '„{tok}“ ist keine Taktart', errKeyPos: '„{tok}“: Vorzeichen dürfen nur am Anfang stehen',
-    errKey: '„{tok}“ ist keine Tonart (z. B. key:G, key:F, key:2#)', errFinger: '„{tok}“: der Finger nach / muss 1 bis 5 sein', errNote: '„{tok}“ ist keine Note auf dem Klavier',
+    errKey: '„{tok}“ ist keine Tonart (z. B. key:G, key:F, key:2#)',
+    errPickup: '„{tok}“: den Auftakt am Anfang in Schlägen schreiben, z. B. pickup:1', errPickupLong: '„{tok}“: der Auftakt muss kürzer als ein Takt sein', errFinger: '„{tok}“: der Finger nach / muss 1 bis 5 sein', errNote: '„{tok}“ ist keine Note auf dem Klavier',
     importTitle: 'MIDI-Datei importieren', importHelp: 'Wähle, welche Hand jede Spur der Datei spielt.',
     part: 'Spur', range: 'Umfang', hand: 'Hand', rightHand: 'Rechte Hand', leftHand: 'Linke Hand', split: 'Am mittleren C teilen', skip: 'Weglassen',
     importedSong: 'Importiertes Stück', midiReadFail: 'Diese MIDI-Datei konnte nicht gelesen werden.', midiNoNotes: 'In dieser Datei wurden keine Klaviernoten gefunden.',
@@ -391,7 +405,12 @@ var BUILTIN_TITLES = {
     'C major scale (both hands)': 'C-Dur-Tonleiter (beide Hände)',
     'Ode to Joy (right hand)': 'Ode an die Freude (rechte Hand)',
     'Twinkle Twinkle (both hands)': 'Twinkle Twinkle Little Star (beide Hände)',
-    'Jingle Bells (chorus, both hands)': 'Jingle Bells (Refrain, beide Hände)'
+    'Jingle Bells (chorus, both hands)': 'Jingle Bells (Refrain, beide Hände)',
+    'Happy Birthday (both hands)': 'Happy Birthday (beide Hände)',
+    'Frère Jacques (both hands)': 'Bruder Jakob (beide Hände)',
+    'Row, Row, Row Your Boat (both hands)': 'Row, Row, Row Your Boat (beide Hände)',
+    'Minuet in G (Petzold, both hands)': 'Menuett in G-Dur (Petzold, beide Hände)',
+    'Für Elise (opening, both hands)': 'Für Elise (Anfang, beide Hände)'
   }
 };
 

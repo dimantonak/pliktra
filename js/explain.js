@@ -126,6 +126,15 @@ var Explain = (function () {
       var pcs = Object.keys(ka).map(function (L) { return ({ C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[L] + ka[L] + 12) % 12; });
       for (var km = 21; km <= 108; km++) if (pcs.indexOf(km % 12) >= 0) keys[km] = km < 60 ? 'L' : 'R';
       noPlay = true;
+    } else if (info.type === 'bar' && info.pickup && !info.final) {
+      var pb = beatsIn(info.len, meter), start = meter[0] - pb + 1, cnt = [];
+      title = t('pickupT');
+      lines.push(t('pickupInfo', { n: fmtBeats(pb), m: meter[0] }));
+      if (Math.abs(start - Math.round(start)) < 1e-6) {   // whole beats: say where to start counting
+        for (var ci = 1; ci <= meter[0]; ci++) cnt.push(ci);
+        lines.push(t('pickupCount', { c: cnt.join(' '), s: Math.round(start) }));
+      }
+      tips.push(t('pickupEnd'));
     } else if (info.type === 'bar') {
       title = t(info.final ? 'endT' : 'barT');
       lines.push(info.final ? t('endInfo') : t('barInfo', { n: meter[0] }));
@@ -166,6 +175,7 @@ var Explain = (function () {
       { pic: { notes: [n(['c/4'], 'q')] }, title: t('ledgerT'), text: t('ledgerInfo') },
       { pic: { notes: [n(['b/4'], 'q'), n(['b/4'], 'q')], bar: true }, title: t('barT'), text: t('barGloss') },
       { pic: { notes: [n(['b/4'], 'h')], end: true }, title: t('endT'), text: t('endInfo') },
+      { pic: { time: '3/4', notes: [n(['g/4'], 'q'), n(['c/5'], 'h', { dot: true })], bar: true }, title: t('pickupT'), text: t('pickupGloss') },
       { pic: null, title: t('fingerT'), text: t('fingerInfo') }
     ];
   }

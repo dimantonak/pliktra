@@ -34,7 +34,40 @@
       text: 'C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 G4/5 C4/1_1.5 D4/2_0.5 | C3/5+E4/3_4 |\n' +
             'F3/2+F4/4 F4/4 F4/4_1.5 F4/4_0.5 | C3/5+F4/4 E4/3 E4/3 E4/3_0.5 E4/3_0.5 | G3/1+E4/3 D4/2 D4/2 E4/3 | G3/1+D4/2_2 G4/5_2 |\n' +
             'C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 E4/3 E4/3_2 | C3/5+E4/3 G4/5 C4/1_1.5 D4/2_0.5 | C3/5+E4/3_4 |\n' +
-            'F3/2+F4/4 F4/4 F4/4_1.5 F4/4_0.5 | C3/5+F4/4 E4/3 E4/3 E4/3_0.5 E4/3_0.5 | G3/1+G4/5 G4/5 F4/4 D4/2 | C3/5+C4/1_4' }
+            'F3/2+F4/4 F4/4 F4/4_1.5 F4/4_0.5 | C3/5+F4/4 E4/3 E4/3 E4/3_0.5 E4/3_0.5 | G3/1+G4/5 G4/5 F4/4 D4/2 | C3/5+C4/1_4' },
+    // Melody "Good Morning to All" by Mildred and Patty Hill (1893), public domain (in the US since a 2015
+    // court ruling, in the EU since 2017). Simple arrangement written for Pliktra.
+    { title: 'Happy Birthday (both hands)',
+      text: '3/4 key:F pickup:1 C4/1_0.5 C4/1_0.5 | F3/2+D4/2 C4/1 F4/4 | C3/5+E4/3_2 C4/1_0.5 C4/1_0.5 | C3/5+D4/2 C4/1 G4/5 |\n' +
+            'F3/2+F4/4_2 C4/1_0.5 C4/1_0.5 | F3/2+C5/5 A4/3 F4/1 | Bb2/5+E4/3 D4/2 Bb4/4_0.5 Bb4/4_0.5 | C3/4+A4/3 F4/1 G4/2 | F3/1+F4/1_2' },
+    // Traditional French song (18th century), public domain; arrangement written for Pliktra.
+    { title: 'Frère Jacques (both hands)',
+      text: 'C3/5+G3/1+C4/1 D4/2 E4/3 C4/1 | C3/5+G3/1+C4/1 D4/2 E4/3 C4/1 | C3/5+G3/1+E4/3 F4/4 G4/5_2 | C3/5+G3/1+E4/3 F4/4 G4/5_2 |\n' +
+            'C3/5+G3/1+G4/4_0.5 A4/5_0.5 G4/4_0.5 F4/3_0.5 E4/2 C4/1 | C3/5+G3/1+G4/4_0.5 A4/5_0.5 G4/4_0.5 F4/3_0.5 E4/2 C4/1 |\n' +
+            'C3/5+C4/4 R:G3/1 C4/4_2 | C3/5+C4/4 R:G3/1 C4/4_2' },
+    // Traditional (published 1852/1881), public domain; arrangement written for Pliktra.
+    { title: 'Row, Row, Row Your Boat (both hands)',
+      text: '6/8 C3/5+C4/1_1.5 C4/1_1.5 | C3/5+C4/1 D4/2_0.5 E4/3_1.5 | C3/5+E4/3 D4/2_0.5 E4/3 F4/4_0.5 | C3/5+G4/5_3 |\n' +
+            'C3/5+C5/4_0.5 C5/4_0.5 C5/4_0.5 G4/1_0.5 G4/1_0.5 G4/1_0.5 | C3/5+E4/3_0.5 E4/3_0.5 E4/3_0.5 C4/1_0.5 C4/1_0.5 C4/1_0.5 |\n' +
+            'G3/1+G4/5 F4/4_0.5 E4/3 D4/2_0.5 | C3/5+C4/1_3' },
+    // Minuet in G (BWV Anh. 114) by Christian Petzold (about 1725), public domain. First part;
+    // the left hand is simplified.
+    { title: 'Minuet in G (Petzold, both hands)',
+      text: '3/4 key:G G3/5+D5/5 G4/1_0.5 A4/2_0.5 A3/4+B4/3_0.5 C5/4_0.5 | B3/3+D5/5 G4/1 G4/1 |\n' +
+            'L:C4/2+E5/3 C5/1_0.5 D5/2_0.5 E5/3_0.5 F#5/4_0.5 | B3/3+G5/5 G4/1 G4/1 |\n' +
+            'A3/4+C5/4 D5/5_0.5 C5/4_0.5 B4/3_0.5 A4/2_0.5 | G3/5+B4/3 C5/4_0.5 B4/3_0.5 A4/2_0.5 G4/1_0.5 |\n' +
+            'L:D4/1+F#4/2 B3/3+G4/1_0.5 A4/2_0.5 G3/5+B4/3_0.5 G4/1_0.5 | L:D4/1+A4/2_3 |\n' +
+            'G3/5+D5/5 G4/1_0.5 A4/2_0.5 A3/4+B4/3_0.5 C5/4_0.5 | B3/3+D5/5 G4/1 G4/1 |\n' +
+            'L:C4/2+E5/3 C5/1_0.5 D5/2_0.5 E5/3_0.5 F#5/4_0.5 | B3/3+G5/5 G4/1 G4/1 |\n' +
+            'A3/4+C5/4 D5/5_0.5 C5/4_0.5 B4/3_0.5 A4/2_0.5 | G3/5+B4/3 C5/4_0.5 B4/3_0.5 A4/2_0.5 G4/1_0.5 |\n' +
+            'L:C4/2+A4/3 B4/4_0.5 A4/3_0.5 G4/2_0.5 F#4/1_0.5 | G3/5+B3/3+G4/2_3' },
+    // Für Elise (WoO 59) by Ludwig van Beethoven (1810), public domain. The opening theme.
+    { title: 'Für Elise (opening, both hands)',
+      text: '3/8 pickup:0.5 E5/5_0.25 D#5/4_0.25 | E5/5_0.25 D#5/4_0.25 E5/5_0.25 B4/2_0.25 D5/4_0.25 C5/3_0.25 |\n' +
+            'A2/5+A4/1_0.25 E3/2_0.25 A3/1_0.25 C4/1_0.25 E4/2_0.25 A4/3_0.25 | E2/5+B4/4_0.25 E3/2_0.25 G#3/1_0.25 E4/1_0.25 G#4/3_0.25 B4/4_0.25 |\n' +
+            'A2/5+C5/5_0.25 E3/2_0.25 A3/1_0.25 E4/1_0.25 E5/5_0.25 D#5/4_0.25 |\n' +
+            'E5/5_0.25 D#5/4_0.25 E5/5_0.25 B4/2_0.25 D5/4_0.25 C5/3_0.25 | A2/5+A4/1_0.25 E3/2_0.25 A3/1_0.25 C4/1_0.25 E4/2_0.25 A4/3_0.25 |\n' +
+            'E2/5+B4/4_0.25 E3/2_0.25 G#3/1_0.25 E4/1_0.25 C5/5_0.25 B4/4_0.25 | A2/5+A4/3_0.25 E3/2_0.25 A3/1_0.5' }
   ];
   // Built-ins from the first version; devices without a record of seen built-ins already had these.
   var FIRST_BUILTINS = ['C major scale (both hands)', 'Ode to Joy (right hand)', 'Twinkle Twinkle (both hands)'];
