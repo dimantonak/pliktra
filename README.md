@@ -4,25 +4,22 @@
 
 **Open it:** https://dimantonak.github.io/pliktra/
 
-Connect a MIDI piano (Roland FP-60X) by USB, pick a song,
+Connect a digital piano or MIDI keyboard, pick a song,
 and the app highlights the next key(s) to play and waits until you play them.
 
-No build step, no dependencies: plain HTML + JavaScript.
+## What you need
 
-## Run it on the PC (for testing)
+- A digital piano or keyboard with **USB MIDI** (most modern ones have a "USB to host" / "USB computer" port).
+- A device with a browser that supports **Web MIDI**: Chrome, Edge or another Chromium-based browser
+  on Android, Windows, macOS, Linux or ChromeOS.
+  Safari (iPhone, iPad, Mac) does not support Web MIDI.
+- A USB cable. Phones and tablets need a USB-OTG cable or adapter.
 
-1. Connect the FP-60X's **USB COMPUTER** port to the PC.
-2. Open `index.html` in **Chrome** (double-click it, or drag it into Chrome).
-3. Allow MIDI access when Chrome asks. The pill at the top right should show the piano's name.
+Open the link, connect the piano and allow MIDI access when the browser asks.
+The pill at the top right shows the piano's name when it is connected.
 
-Without a piano you can tap the on-screen keys or use the computer keyboard
+Without a piano you can tap the on-screen keys or use a computer keyboard
 (`A W S E D F T G Y H U J K` = C to C, `Z`/`X` = octave down/up).
-
-## Use it on the tablet
-
-Browsers only allow MIDI on secure (https) pages, so the folder must be hosted online
-(e.g. GitHub Pages or Netlify, both free). Then open the link in Chrome on the Fire tablet and
-connect the piano with a USB-B to USB-C cable.
 
 ## Songs
 
@@ -53,6 +50,10 @@ Songs, settings and best scores are saved in the browser on that device (localSt
 - `js/midifile.js` - `.mid` file reader
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
+
+No build step and no dependencies to install: plain HTML + JavaScript.
+To host your own copy, put the folder on any https web host (e.g. GitHub Pages);
+browsers only allow MIDI on secure pages.
 
 ## Licence
 

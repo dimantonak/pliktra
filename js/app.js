@@ -72,7 +72,7 @@
 
   function saveSongs() {
     if (!store.set('pliktra.songs', songs)) {
-      alert('The tablet’s storage for this app is full. Delete a long song and try again.');
+      alert('This device’s storage for this app is full. Delete a long song and try again.');
       return false;
     }
     return true;
