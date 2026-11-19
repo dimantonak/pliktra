@@ -37,11 +37,13 @@ and **restore** it later or on another device.
 
 ## Practice views
 
-- **Falling notes** (default): notes fall onto the keys; the app waits for the right keys.
-- **♫ Sheet**: the song as sheet music (grand staff). The notes to play are coloured
+- **♫ Sheet** (default): the song as sheet music (grand staff). The notes to play are coloured
   (blue = right hand, orange = left hand), played notes fade, and the score scrolls along.
   Each hand's rhythm comes from the song text: a note lasts until that hand's next note,
   a rest or the bar line. Available for typed songs.
+- **Falling notes** (tap ♫ Sheet to switch): notes fall onto the keys; the app waits for the right keys.
+  Imported MIDI files are always shown this way.
+- **Note names** are shown on all white keys; in Settings you can reduce them to the C keys or turn them off.
 - **✋ Fingers**: finger numbers (1 = thumb … 5 = little finger) on notes, keys and score.
 - **▶ Listen**: plays the song (the hands you are practising) from the current position, on the piano's
   own sound when it is connected, otherwise through the device. Speed can be lowered in Settings.

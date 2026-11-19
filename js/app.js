@@ -43,8 +43,15 @@
     return { id: newId(), title: title, kind: 'text', text: text, notes: parseSongText(text).notes };
   }
 
-  var settings = Object.assign({ labels: 'C', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'lane',
-    listenSpeed: '1', listenOnPiano: true }, store.get('pliktra.settings', {}));
+  var savedSettings = store.get('pliktra.settings', {});
+  var settings = Object.assign({ labels: 'all', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'sheet',
+    listenSpeed: '1', listenOnPiano: true }, savedSettings);
+  if ((savedSettings.v || 1) < 2) {   // v2: sheet music and note names on all keys became the defaults
+    settings.view = 'sheet';
+    settings.labels = 'all';
+  }
+  settings.v = 2;
+  store.set('pliktra.settings', settings);
   var songs = store.get('pliktra.songs', null);
   var seenBuiltins = store.get('pliktra.builtinsSeen', null);
   if (!Array.isArray(songs)) {
@@ -108,6 +115,7 @@
     st.song = song;
     store.set('pliktra.lastSong', song ? song.id : null);
     $('#songTitle').textContent = song ? song.title : 'No song loaded';
+    showViewToggle();
     rebuildSteps();
   }
 
@@ -188,7 +196,8 @@
   // ---------------------------------------------------------------- sheet music view
   var sheetState = { key: '', data: null };
 
-  function sheetOn() { return settings.view === 'sheet'; }
+  // Sheet music exists only for typed songs; MIDI files are always shown as falling notes.
+  function sheetOn() { return settings.view === 'sheet' && !(st.song && st.song.kind !== 'text'); }
 
   function refreshSheet() {
     var box = $('#sheet'), inner = $('#sheetInner'), msgEl = $('#sheetMsg');
@@ -201,7 +210,6 @@
     box.style.height = geo.kbTop + 'px';
     var msg = '';
     if (!st.song) msg = 'Choose a song to see its sheet music.';
-    else if (st.song.kind !== 'text') msg = 'Sheet music is available for typed songs. MIDI files are shown as falling notes (tap ♫ Sheet to switch back).';
     else if (!sheetLib) msg = 'The sheet music could not be loaded. Check the internet connection and reload.';
     if (!msg) {
       var scale = Math.max(0.5, Math.min(1.5, (geo.kbTop - 8) / 290));
@@ -1280,12 +1288,14 @@
   };
   showFingerToggle();
   function showViewToggle() {
-    var b = $('#btnView');
+    var b = $('#btnView'), midi = !!(st.song && st.song.kind !== 'text');
+    b.disabled = midi;
+    b.title = midi ? 'Sheet music is available for typed songs only' : 'Show sheet music instead of falling notes';
     b.classList.toggle('on', sheetOn());
     b.setAttribute('aria-pressed', sheetOn() ? 'true' : 'false');
   }
   $('#btnView').onclick = function () {
-    settings.view = sheetOn() ? 'lane' : 'sheet';
+    settings.view = settings.view === 'sheet' ? 'lane' : 'sheet';
     store.set('pliktra.settings', settings);
     showViewToggle();
     refreshSheet();

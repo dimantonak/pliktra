@@ -88,6 +88,7 @@ body {
   white-space: nowrap;
 }
 .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .4; cursor: default; transform: none; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.danger { color: var(--bad); }
 .btn.icon { width: 40px; padding: 0; justify-content: center; }
