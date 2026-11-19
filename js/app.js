@@ -216,7 +216,7 @@
     $('#hint').style.top = sheetOn() && geo ? Math.max(12, geo.kbTop - 52) + 'px' : '';
     $('#hint').classList.toggle('on-paper', sheetOn());   // dark text on the light score
     dirty = true;
-    if (!sheetOn() || !geo) return;
+    if (!sheetOn() || !geo) { closeExplain(); return; }
     box.style.height = geo.kbTop + 'px';
     var msg = '';
     if (!st.song) msg = t('sheetChoose');
@@ -225,6 +225,9 @@
       var scale = Math.max(0.5, Math.min(1.5, (geo.kbTop - 8) / 290));
       var key = [st.song.id, settings.fingers, scale.toFixed(3), st.song.text].join('|');
       if (key !== sheetState.key) {
+        // Same song drawn again (other size, finger numbers on/off): keep the card on the same symbol.
+        var oldData = sheetState.data, sameSong = sheetState.key.split('|')[0] === st.song.id && sheetState.key.slice(-st.song.text.length) === st.song.text;
+        var keepHit = explain && oldData && sameSong ? oldData.hits.indexOf(explain.hit) : -1;
         try {
           sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale });
           var room = geo.kbTop - 8;   // grew taller (very high/low notes)? draw it a bit smaller
@@ -233,7 +236,11 @@
               { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height) });
           }
           sheetState.key = key;
+          var again = keepHit >= 0 && sheetState.data.hits[keepHit];
+          if (again && again.info.type === explain.hit.info.type) explain.hit = again;
+          else closeExplain();
         } catch (e) {
+          closeExplain();
           if (window.console) console.error(e);
           sheetState.data = null; sheetState.key = '';
           msg = t('sheetFail');
@@ -243,6 +250,7 @@
     msgEl.textContent = msg;
     inner.style.display = msg ? 'none' : '';
     if (msg) {   // forget the old score so nothing refers to it
+      closeExplain();
       sheetState.key = ''; sheetState.data = null;
       $('#sheetSvg').innerHTML = '';
       return;
@@ -251,10 +259,12 @@
     inner.style.marginTop = Math.max(0, (geo.kbTop - sheetState.data.height) / 2) + 'px';
     $('#sheetCursor').style.width = Math.round(28 * Math.max(0.6, sheetState.data.height / 290)) + 'px';
     updateSheetCursor(true);
+    if (explain) placeExplain();   // same score, new size (e.g. the screen was turned)
   }
 
   // Colours the notes to play now, fades the ones already played and scrolls them into view.
   function updateSheetCursor(instant) {
+    if (explain && explain.idx !== st.idx) closeExplain();   // played on: the card is about an old spot
     var d = sheetState.data;
     if (!d || !sheetOn() || $('#sheet').hidden) return;
     var step = currentStep();
@@ -288,6 +298,130 @@
       inner.style.transition = ''; cursor.style.transition = '';
     }
   }
+
+  // ---------------------------------------------------------------- explanations (tap a symbol in the score)
+  // Tap (or click) a note, rest, clef, time signature or bar line: a card says what it means and the
+  // note's keys light up on the keyboard. With a mouse, pointing at a symbol shows it too.
+  var explain = null;      // { hit, idx, pinned }
+  var explainKeys = {};    // midi -> hand, lit on the keyboard while the card is open
+
+  // Client (screen) point -> the score's own units, which Sheet.render's hits use.
+  function scorePoint(clientX, clientY) {
+    var svg = $('#sheetSvg svg');
+    if (!svg) return null;
+    var r = svg.getBoundingClientRect(), vb = svg.viewBox && svg.viewBox.baseVal;
+    if (!r.width || !r.height) return null;
+    var v = vb && vb.width ? vb : { x: 0, y: 0, width: r.width, height: r.height };
+    return { x: v.x + (clientX - r.left) * v.width / r.width, y: v.y + (clientY - r.top) * v.height / r.height,
+      toClient: function (x, y) { return { x: r.left + (x - v.x) * r.width / v.width, y: r.top + (y - v.y) * r.height / v.height }; } };
+  }
+
+  function hitAtClient(clientX, clientY) {
+    var d = sheetState.data, p = scorePoint(clientX, clientY);
+    if (!d || !p) return null;
+    var h = Sheet.hitAt(d.hits, p.x, p.y);
+    return h ? { hit: h, toClient: p.toClient } : null;
+  }
+
+  function showExplain(found, pinned) {
+    var d = sheetState.data, c = Explain.card(found.hit.info, d.meter);
+    var box = $('#explain');
+    $('#exTitle').textContent = c.title;
+    var ul = $('#exLines');
+    ul.innerHTML = '';
+    c.lines.forEach(function (l) { ul.appendChild(el('li', '', l)); });
+    c.tips.forEach(function (l) { ul.appendChild(el('li', 'tip', l)); });
+    $('#exPlay').hidden = !Object.keys(c.keys).length;
+    explain = { hit: found.hit, idx: st.idx, pinned: pinned, keys: c.keys };
+    explainKeys = c.keys;
+    dirty = true;
+    box.hidden = false;
+    placeExplain();
+  }
+
+  // Next to the symbol: above it if there is room, otherwise below; always inside the score area.
+  function placeExplain() {
+    var p = scorePoint(0, 0), box = $('#explain');
+    if (!explain || !p) return;
+    var sheetR = $('#sheet').getBoundingClientRect(), h = explain.hit;
+    var a = p.toClient(h.x, h.y), b = p.toClient(h.x + h.w, h.y + h.h);
+    var cw = box.offsetWidth, ch = box.offsetHeight, W = sheetR.width, H = sheetR.height;
+    var sx0 = a.x - sheetR.left, sx1 = b.x - sheetR.left, sy0 = a.y - sheetR.top, sy1 = b.y - sheetR.top;
+    var left = Math.max(8, Math.min(W - cw - 8, (sx0 + sx1) / 2 - cw / 2)), top;
+    if (sy0 - ch - 10 >= 8) top = sy0 - ch - 10;              // above
+    else if (sy1 + 10 + ch <= H - 8) top = sy1 + 10;          // below
+    else {                                                    // beside, so the symbol stays visible
+      top = Math.max(8, Math.min(H - ch - 8, (sy0 + sy1) / 2 - ch / 2));
+      left = sx1 + 12 + cw <= W - 8 ? sx1 + 12 : Math.max(8, sx0 - 12 - cw);
+    }
+    box.style.left = Math.round(left) + 'px';
+    box.style.top = Math.round(top) + 'px';
+  }
+
+  function closeExplain() {
+    if (!explain) return;
+    explain = null;
+    explainKeys = {};
+    $('#explain').hidden = true;
+    dirty = true;
+  }
+
+  $('#sheetInner').addEventListener('click', function (e) {
+    var found = hitAtClient(e.clientX, e.clientY);
+    if (found && !(explain && explain.pinned && explain.hit === found.hit)) showExplain(found, true);
+    else closeExplain();   // tapped the same symbol again, or nothing
+  });
+  var hoverTimer = 0;
+  $('#sheetInner').addEventListener('pointermove', function (e) {
+    if (e.pointerType !== 'mouse' || (explain && explain.pinned)) return;
+    clearTimeout(hoverTimer);
+    var x = e.clientX, y = e.clientY;
+    hoverTimer = setTimeout(function () {
+      var found = hitAtClient(x, y);
+      if (found) { if (!explain || explain.hit !== found.hit) showExplain(found, false); }
+      else closeExplain();
+    }, 250);
+  });
+  $('#sheetInner').addEventListener('pointerleave', function () {
+    clearTimeout(hoverTimer);
+    if (explain && !explain.pinned) closeExplain();
+  });
+  $('#explain').addEventListener('click', function (e) { e.stopPropagation(); });
+  $('#exClose').onclick = closeExplain;
+  // A tap anywhere else closes it (but not the screen keyboard, so the lit keys can be tried out).
+  document.addEventListener('pointerdown', function (e) {
+    if (!explain || !explain.pinned) return;
+    var tg = e.target;
+    if ($('#explain').contains(tg) || $('#sheetInner').contains(tg) || tg === cv) return;
+    closeExplain();
+  }, true);
+  $('#exPlay').onclick = function () {
+    if (!explain) return;
+    var out = demoOutput(), ms = 900;
+    Object.keys(explain.keys).forEach(function (k) {
+      var m = +k;
+      if (out) {
+        try { out.send([0x90, m, 80]); out.send([0x80, m, 0], performance.now() + ms); return; } catch (err) { /* unplugged */ }
+      }
+      synth.play(m, 0, ms / 1000);
+    });
+  };
+
+  // "What the symbols mean" in the settings: built when opened.
+  $('#symbolsHelp').addEventListener('toggle', function () {
+    if (!$('#symbolsHelp').open) return;
+    var ul = $('#symbolsList'), canDraw = typeof Sheet !== 'undefined' && Sheet.available();
+    ul.innerHTML = '';
+    Explain.glossary().forEach(function (g) {
+      var li = el('li'), pic = el('div', 'sym-pic'), txt = el('div', 'sym-txt');
+      if (g.pic && canDraw) { try { Sheet.mini(pic, g.pic); } catch (err) { pic.textContent = ''; } }
+      else if (!g.pic) pic.appendChild(el('span', 'sym-finger', '3'));
+      txt.appendChild(el('b', '', g.title));
+      txt.appendChild(el('span', '', g.text));
+      li.appendChild(pic); li.appendChild(txt);
+      ul.appendChild(li);
+    });
+  });
 
   function updateHint() {
     var h = '';
@@ -743,6 +877,7 @@
   function keyState(m, now, step) {
     if (wrong[m] && now - wrong[m] < 380) return { fill: '#f25f5c', deep: '#c73a37', strong: true };
     if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], deep: HAND_DEEP[demoKeys[m]], strong: true, hand: demoKeys[m] };   // sounding in Listen
+    if (explainKeys[m]) return { fill: HAND_COLOR[explainKeys[m]], deep: HAND_DEEP[explainKeys[m]], strong: true, hand: explainKeys[m] };   // tapped in the score
     if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0) {
       var hand = step.hands[m];
       var on = !!(held[m] || st.hits[m]);
@@ -1012,6 +1147,7 @@
     if (e.key !== 'Escape') return;
     var open = document.querySelectorAll('.modal.open');
     if (open.length) { e.preventDefault(); dismissModal(open[open.length - 1].id); }
+    else if (explain) closeExplain();
   });
 
   // ---------------------------------------------------------------- library

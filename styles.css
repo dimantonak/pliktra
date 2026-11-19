@@ -382,6 +382,43 @@ body {
   pointer-events: none;
 }
 .hint:empty { display: none; }
+
+/* explanation card: tap a symbol in the sheet music */
+#sheetInner { cursor: pointer; }
+.explain {
+  position: absolute;
+  z-index: 5;
+  width: min(330px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  padding: 10px 12px 10px 14px;
+  border-radius: 12px;
+  background: #fffdf8;
+  border: 1px solid rgba(30, 26, 18, 0.14);
+  box-shadow: 0 12px 32px rgba(24, 20, 12, 0.28);
+  color: #262b33;
+  font-size: 14px;
+  line-height: 1.4;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.ex-head { display: flex; align-items: center; gap: 6px; }
+.ex-head b { flex: 1; min-width: 0; font-size: 15.5px; }
+.explain .btn { color: var(--text); }
+.explain ul { margin: 6px 0 0; padding-left: 18px; }
+.explain li { margin-bottom: 3px; }
+.explain li.tip { color: #5d6570; font-size: 12.5px; }
+
+/* "What the symbols mean" */
+.symbols { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 6px; }
+.symbols li { display: flex; align-items: center; gap: 12px; margin: 0; }
+.sym-pic { flex: none; width: 60px; height: 74px; display: flex; align-items: center; justify-content: center;
+  background: var(--paper); border-radius: 8px; overflow: hidden; }
+.sym-pic svg { display: block; }
+.sym-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.sym-txt b { color: var(--text); }
+.sym-finger { width: 26px; height: 26px; border-radius: 50%; background: #14171f; color: #fff; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; }
 .hint.on-paper {
   background: rgba(250, 247, 240, 0.9);
   border-color: rgba(30, 26, 18, 0.12);

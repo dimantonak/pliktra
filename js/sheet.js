@@ -151,7 +151,7 @@ var Sheet = (function () {
     var ctx = renderer.getContext();
     ctx.scale(s, s);
 
-    var marks = {}, pending = [], x = 15, last = lay.bars.length - 1, minY = 0, maxY = H;
+    var marks = {}, pending = [], hits = [], x = 15, last = lay.bars.length - 1, minY = 0, maxY = H;
     // Compound meters (3/8, 6/8, 9/8, 12/8): eighth notes are beamed in groups of three.
     var compound = lay.meter[1] === 8 && lay.meter[0] % 3 === 0;
     var beamOpts = compound ? { groups: [new VF.Fraction(3, 8)] } : undefined;
@@ -170,10 +170,21 @@ var Sheet = (function () {
       if (i === 0) {
         new VF.StaveConnector(sT, sB).setType('brace').setContext(ctx).draw();
         new VF.StaveConnector(sT, sB).setType('singleLeft').setContext(ctx).draw();
+        // what can be tapped for an explanation (js/explain.js): clefs, time signatures, the brace
+        [[sT, 'treble'], [sB, 'bass']].forEach(function (c) {
+          var top = c[0].getYForLine(0), bot = c[0].getYForLine(4);
+          c[0].getModifiers().forEach(function (m) {
+            var cat = m.getCategory();
+            if (cat === 'Clef') hits.push({ x: m.getX(), y: top - 20, w: m.getWidth(), h: bot - top + 40, info: { type: 'clef', clef: c[1] } });
+            if (cat === 'TimeSignature') hits.push({ x: m.getX(), y: top, w: m.getWidth(), h: bot - top, info: { type: 'time' } });
+          });
+        });
+        hits.push({ x: x - 15, y: sT.getYForLine(0), w: 14, h: sB.getYForLine(4) - sT.getYForLine(0), info: { type: 'brace' } });
       }
+      hits.push({ x: x + w - 5, y: sT.getYForLine(0), w: 10, h: sB.getYForLine(4) - sT.getYForLine(0), info: { type: 'bar', final: i === last } });
       new VF.StaveConnector(sT, sB).setType(i === last ? 'boldDoubleRight' : 'singleRight').setContext(ctx).draw();
 
-      var voices = [], extras = [], fingerJobs = [];
+      var voices = [], extras = [], fingerJobs = [], noteJobs = [];
       [['R', 'treble', sT], ['L', 'bass', sB]].forEach(function (cfg) {
         var hand = cfg[0], items = bar[hand];
         var notes = items.map(function (it) { return makeNote(VF, it, cfg[1], hand, opts); });
@@ -187,9 +198,11 @@ var Sheet = (function () {
             var idx = it.notes.map(function (_, j) { return j; });
             extras.push(new VF.StaveTie({ first_note: notes[k], last_note: notes[k + 1], first_indices: idx, last_indices: idx }));
           }
+          var job = { note: notes[k], it: it, hand: hand };
+          noteJobs.push(job);
           if (!it.rest && it.first) {
             pending.push({ key: beatKey(it.b), hand: hand, note: notes[k] });
-            if (opts.fingers) fingerJobs.push({ note: notes[k], it: it, hand: hand, stave: cfg[2] });
+            if (opts.fingers) fingerJobs.push({ note: notes[k], it: it, hand: hand, stave: cfg[2], job: job });
           }
         });
         voices.push({ voice: voice, stave: cfg[2] });
@@ -207,8 +220,9 @@ var Sheet = (function () {
       extras.forEach(function (e) { e.setContext(ctx).draw(); });
       fingerJobs.forEach(function (j) {
         var e = drawFingers(ctx, j.note, j.it, j.hand, j.stave);
-        if (e) { minY = Math.min(minY, e[0]); maxY = Math.max(maxY, e[1]); }
+        if (e) { minY = Math.min(minY, e[0]); maxY = Math.max(maxY, e[1]); j.job.ext = e; }
       });
+      noteJobs.forEach(function (j) { var h = noteHit(j); if (h) hits.push(h); });
       x += w;
     });
 
@@ -223,10 +237,74 @@ var Sheet = (function () {
     pending.forEach(function (p) {
       (marks[p.key] = marks[p.key] || []).push({ hand: p.hand, x: p.note.getAbsoluteX() * s, el: p.note.getSVGElement() });
     });
-    return { width: total * s, height: (bot - top) * s, marks: marks };
+    return { width: total * s, height: (bot - top) * s, marks: marks, hits: hits, meter: lay.meter };
   }
 
-  return { available: available, render: render, beatKey: beatKey, layoutBars: layoutBars, makeNote: makeNote };
+  // A drawn note or rest -> { x, y, w, h, info } for explanations (finger numbers count as part of it).
+  function noteHit(j) {
+    var bb;
+    try { bb = j.note.getBoundingBox(); } catch (e) { return null; }
+    if (!bb) return null;
+    var y0 = bb.getY(), y1 = bb.getY() + bb.getH(), it = j.it, info;
+    if (j.ext) { y0 = Math.min(y0, j.ext[0]); y1 = Math.max(y1, j.ext[1]); }
+    if (it.rest) info = { type: 'rest', dur: it.dur, dotted: !!it.dotted, len: it.len, whole: !!it.whole, hand: j.hand };
+    else {
+      var acc = {};
+      j.note.getModifiersByType('Accidental').forEach(function (a) { acc[a.getIndex()] = a.type; });
+      info = { type: 'note', dur: it.dur, dotted: !!it.dotted, len: it.len, hand: j.hand, first: it.first, tieNext: it.tieNext,
+        beam: !!(j.note.hasBeam && j.note.hasBeam()), acc: acc,
+        notes: it.notes.slice().sort(function (a, b) { return a.m - b.m; }).map(function (n) { return { m: n.m, s: n.s, f: n.f }; }) };
+    }
+    return { x: bb.getX(), y: y0, w: bb.getW(), h: y1 - y0, info: info };
+  }
+
+  // The symbol at (x, y) in the score's own units (see render): the closest one within a few units.
+  function hitAt(hits, x, y) {
+    var best = null, bestD = 12, bestA = Infinity;
+    (hits || []).forEach(function (h) {
+      var dx = Math.max(h.x - x, 0, x - (h.x + h.w)), dy = Math.max(h.y - y, 0, y - (h.y + h.h));
+      var d = Math.sqrt(dx * dx + dy * dy), a = h.w * h.h;
+      if (d < bestD - 1e-6 || (Math.abs(d - bestD) < 1e-6 && a < bestA)) { best = h; bestD = d; bestA = a; }
+    });
+    return best;
+  }
+
+  // A small drawing of one symbol for the "What the symbols mean" list.
+  // spec: { clef, time, notes: [{ keys, dur, dot, rest, acc }], beam, tie, bar, end }
+  function mini(container, spec) {
+    var VF = Vex.Flow, s = 0.62, W = 96, H = 118;
+    container.innerHTML = '';
+    var r = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+    r.resize(Math.ceil(W * s), Math.ceil(H * s));
+    var ctx = r.getContext();
+    ctx.scale(s, s);
+    var stave = new VF.Stave(2, 0, W - 6);
+    stave.setBegBarType(VF.Barline.type.NONE);
+    stave.setEndBarType(spec.end ? VF.Barline.type.END : VF.Barline.type.NONE);
+    if (spec.clef) stave.addClef(spec.clef);
+    if (spec.time) stave.addTimeSignature(spec.time);
+    stave.setContext(ctx).draw();
+    if (!spec.notes) return;
+    var notes = spec.notes.map(function (n) {
+      var sn = new VF.StaveNote({ keys: n.keys, duration: n.dur + (n.dot ? 'd' : '') + (n.rest ? 'r' : ''), auto_stem: !n.rest });
+      if (n.dot) VF.Dot.buildAndAttach([sn], { all: true });
+      if (n.acc) sn.addModifier(new VF.Accidental(n.acc), 0);
+      return sn;
+    });
+    var voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT);
+    voice.addTickables(notes);
+    var beams = spec.beam ? VF.Beam.generateBeams(notes) : [];
+    new VF.Formatter().joinVoices([voice]).format([voice], W - 30);
+    voice.draw(ctx, stave);
+    beams.forEach(function (b) { b.setContext(ctx).draw(); });
+    if (spec.tie) new VF.StaveTie({ first_note: notes[0], last_note: notes[1], first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
+    if (spec.bar) {   // a bar line between the two notes
+      var bx = (notes[0].getAbsoluteX() + notes[1].getAbsoluteX()) / 2 + 4;
+      ctx.fillRect(bx, stave.getYForLine(0), 1, stave.getYForLine(4) - stave.getYForLine(0));
+    }
+  }
+
+  return { available: available, render: render, beatKey: beatKey, layoutBars: layoutBars, makeNote: makeNote, hitAt: hitAt, mini: mini };
 })();
 
 if (typeof module !== 'undefined') module.exports = { Sheet: Sheet };

@@ -46,6 +46,10 @@ and **restore** it later or on another device.
   (blue = right hand, orange = left hand), played notes fade, and the score scrolls along.
   Each hand's rhythm comes from the song text: a note lasts until that hand's next note,
   a rest or the bar line. Available for typed songs.
+- **Learn the symbols**: in the sheet music, tap any note, rest, clef, time signature or bar line
+  (or point at it with a mouse). A card explains it: its name, how many beats it lasts, where the
+  note sits on the staff, ♯/♭/♮, ties, finger numbers. The note's keys light up on the keyboard,
+  and *Play* lets you hear it. *Settings → What the symbols mean* lists them all with pictures.
 - **Falling notes** (tap ♫ Sheet to switch): notes fall onto the keys; the app waits for the right keys.
   Imported MIDI files are always shown this way.
 - **Note names** are shown on all white keys; in Settings you can reduce them to the C keys or turn them off.
@@ -77,6 +81,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/notation.js` - note names, typed-song parser, grouping notes into steps
 - `js/midifile.js` - `.mid` file reader
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
+- `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
 - `tests/` - automated tests: `node --test tests/`
