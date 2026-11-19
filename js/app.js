@@ -122,6 +122,7 @@
   function loadSong(song) {
     st.song = song;
     store.set('pliktra.lastSong', song ? song.id : null);
+    if (song) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
     $('#songTitle').textContent = song ? songName(song) : t('noSong');
     showViewToggle();
     rebuildSteps();
@@ -876,7 +877,7 @@
   }
   function isOpen(id) { return $('#' + id).classList.contains('open'); }
   function anyModalOpen() { return !!document.querySelector('.modal.open'); }
-  function closeAll() { ['mLibrary', 'mEditor', 'mImport', 'mResult', 'mSettings'].forEach(closeModal); }
+  function closeAll() { ['mLibrary', 'mSong', 'mEditor', 'mImport', 'mResult', 'mSettings'].forEach(closeModal); }
 
   document.querySelectorAll('[data-close]').forEach(function (b) {
     b.addEventListener('click', function () { dismissModal(b.closest('.modal').id); });   // asks if the editor has changes
@@ -928,49 +929,94 @@
     return ' · ' + t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') });
   }
 
-  function renderLibrary() {
-    var ul = $('#songList');
-    ul.innerHTML = '';
-    if (!songs.length) { ul.appendChild(el('li', 'muted', t('noSongs'))); return; }
-    songs.forEach(function (s) {
-      var li = el('li', st.song && st.song.id === s.id ? 'current' : '');
-      var info = el('div', 'info');
-      info.appendChild(el('div', 'name', songName(s)));
-      var nSteps = buildSteps(s.notes, 'B').length;
-      var meta = t(nSteps === 1 ? 'metaStep1' : 'metaSteps', { n: nSteps }) + ' · ' + handsLabel(s.notes) +
-        ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + bestLabel(s);
-      info.appendChild(el('div', 'meta', meta));
-      li.appendChild(info);
+  // Starter songs: built-in songs the user hasn't changed. Once there are own songs, they are
+  // folded away at the bottom of the list.
+  function isStarter(s) {
+    return s.kind === 'text' && BUILTIN.some(function (b) { return b.title === s.title && b.text === s.text; });
+  }
+  var startersOpen = null;   // the user opened/closed the starter songs (this visit only)
 
-      var play = el('button', 'btn primary small', t('practise'));
-      play.onclick = function () { closeAll(); loadSong(s); };
-      var edit = el('button', 'btn small', t(s.kind === 'midi' ? 'rename' : 'edit'));
-      edit.onclick = function () {
-        if (s.kind === 'midi') {
-          var nt = prompt(t('songTitlePrompt'), s.title);
-          if (nt && nt.trim()) { s.title = nt.trim(); saveSongs(); renderLibrary(); if (st.song === s) $('#songTitle').textContent = songName(s); }
-        } else openEditor(s);
-      };
-      var del = el('button', 'btn small danger', t('del'));
-      del.onclick = function () {
-        if (!confirm(t('confirmDelete', { t: songName(s) }))) return;
-        songs = songs.filter(function (x) { return x !== s; });
-        saveSongs();
-        ['B', 'R', 'L'].forEach(function (h) { delete best[s.id + ':' + h]; });
-        store.set('pliktra.best', best);
-        if (st.song === s) loadSong(null);
-        renderLibrary();
-      };
-      li.appendChild(play); li.appendChild(edit);
-      if (s.kind !== 'midi') {
-        var share = el('button', 'btn small', t('share'));
-        share.onclick = function () { shareSong(s); };
-        li.appendChild(share);
-      }
-      li.appendChild(del);
+  // Tap a song to practise it; ⋯ opens its other actions. Most recently played or added first.
+  function renderLibrary() {
+    var box = $('#songList');
+    box.innerHTML = '';
+    $('#libHint').hidden = !songs.length;
+    if (!songs.length) { box.appendChild(el('p', 'muted', t('noSongs'))); return; }
+    var ordered = songs.slice().sort(function (a, b) { return (b.recent || 0) - (a.recent || 0); });
+    var own = ordered.filter(function (s) { return !isStarter(s); });
+    var starters = ordered.filter(isStarter);
+    if (!own.length || !starters.length) { box.appendChild(songListEl(ordered)); return; }
+    box.appendChild(songListEl(own));
+    var det = el('details', 'starters');
+    det.open = startersOpen != null ? startersOpen : !!(st.song && isStarter(st.song));
+    det.appendChild(el('summary', '', t('starterSongs', { n: starters.length })));
+    det.appendChild(songListEl(starters));
+    det.addEventListener('toggle', function () { startersOpen = det.open; });
+    box.appendChild(det);
+  }
+
+  function songListEl(list) {
+    var ul = el('ul', 'songlist');
+    list.forEach(function (s) {
+      var li = el('li', st.song && st.song.id === s.id ? 'current' : '');
+      var pick = el('button', 'pick');
+      pick.type = 'button';
+      pick.appendChild(el('span', 'name', songName(s)));
+      var nSteps = buildSteps(s.notes, 'B').length;
+      pick.appendChild(el('span', 'meta', t(nSteps === 1 ? 'metaStep1' : 'metaSteps', { n: nSteps }) + ' · ' +
+        handsLabel(s.notes) + ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + bestLabel(s)));
+      pick.onclick = function () { closeAll(); loadSong(s); };
+      var more = el('button', 'btn icon more', '⋯');
+      more.type = 'button';
+      more.title = t('moreActions');
+      more.setAttribute('aria-label', t('moreActionsFor', { t: songName(s) }));
+      more.onclick = function () { openSongActions(s); };
+      li.appendChild(pick); li.appendChild(more);
       ul.appendChild(li);
     });
+    return ul;
   }
+
+  // ---------------------------------------------------------------- one song's actions (⋯)
+  var actionSong = null;
+  function openSongActions(s) {
+    actionSong = s;
+    $('#mSongName').textContent = songName(s);
+    $('#saEdit').textContent = t(s.kind === 'midi' ? 'rename' : 'edit');
+    $('#saShare').hidden = s.kind === 'midi';   // MIDI files are too big for a link
+    openModal('mSong');
+  }
+  $('#saEdit').onclick = function () {
+    var s = actionSong;
+    closeModal('mSong');
+    if (s.kind !== 'midi') { openEditor(s); return; }
+    var nt = prompt(t('songTitlePrompt'), s.title);
+    if (nt && nt.trim()) { s.title = nt.trim(); saveSongs(); renderLibrary(); if (st.song === s) $('#songTitle').textContent = songName(s); }
+  };
+  $('#saShare').onclick = function () { closeModal('mSong'); shareSong(actionSong); };
+  $('#saDuplicate').onclick = function () {
+    var s = actionSong;
+    var copy = s.kind === 'midi'
+      ? { id: newId(), title: '', kind: 'midi', notes: JSON.parse(JSON.stringify(s.notes)) }
+      : songFromText('', s.text);
+    copy.title = t('copyTitle', { t: songName(s) });
+    copy.recent = Date.now();
+    songs.unshift(copy);
+    if (!saveSongs()) { songs.shift(); return; }
+    closeModal('mSong');
+    renderLibrary();
+  };
+  $('#saDelete').onclick = function () {
+    var s = actionSong;
+    if (!confirm(t('confirmDelete', { t: songName(s) }))) return;
+    songs = songs.filter(function (x) { return x !== s; });
+    saveSongs();
+    ['B', 'R', 'L'].forEach(function (h) { delete best[s.id + ':' + h]; });
+    store.set('pliktra.best', best);
+    closeModal('mSong');
+    if (st.song === s) loadSong(null);
+    renderLibrary();
+  };
 
   // ---------------------------------------------------------------- song links (#song=...)
   // The song travels inside the link's #fragment, which browsers never send to the server,
@@ -1070,6 +1116,8 @@
         x.song = x.isMidi ? { id: newId(), title: x.title, kind: 'midi', notes: x.notes } : songFromText(x.title, x.d.s);
         return x.song;
       });
+      var now = Date.now();
+      created.forEach(function (s, k) { s.recent = now - k; });   // new songs at the top of the list
       songs = created.concat(songs);
       if (!saveSongs()) {
         songs = songs.slice(created.length);

@@ -51,7 +51,8 @@
         <button id="btnNew" class="btn primary" data-i18n="newSong">+ New song</button>
         <label class="btn"><span data-i18n="importMidi">Import MIDI file</span><input type="file" id="fileMidi" accept=".mid,.midi,audio/midi,audio/x-midi" hidden></label>
       </div>
-      <ul id="songList" class="songlist"></ul>
+      <p id="libHint" class="muted small" data-i18n="libHint">Tap a song to practise it. &#8943; edits, shares, duplicates or deletes it.</p>
+      <div id="songList"></div>
       <div class="backup">
         <p class="muted small" data-i18n="backupNote">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
         <div class="row gap">
@@ -59,6 +60,19 @@
           <button id="btnBackup" class="btn small" data-i18n="saveBackup">Save backup file</button>
           <label class="btn small"><span data-i18n="restoreBackup">Restore backup</span><input type="file" id="fileRestore" accept=".json,application/json" hidden></label>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- One song's actions (the ⋯ button in the song list) -->
+  <div class="modal" id="mSong">
+    <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="mSongName">
+      <div class="sheet-head"><h2 id="mSongName"></h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
+      <div class="actions">
+        <button id="saEdit" class="btn">Edit</button>
+        <button id="saShare" class="btn" data-i18n="shareLinkBtn">Share as link</button>
+        <button id="saDuplicate" class="btn" data-i18n="duplicate">Duplicate</button>
+        <button id="saDelete" class="btn danger" data-i18n="del">Delete</button>
       </div>
     </div>
   </div>
