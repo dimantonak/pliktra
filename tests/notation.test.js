@@ -56,6 +56,15 @@ test('playback: a key struck again is released just before', () => {
   assert.equal(p[1].d, 2);              // other keys unchanged
   assert.equal(p[2].d, 0.4);
   assert.equal(notes[0].d, 1);          // the song itself is not changed
+  assert.equal(p[0].next, 0.5);         // the player won't stretch it past this
+  assert.equal(p[1].next, null);
+});
+
+test('playback: the same key at the same time is played once', () => {
+  const p = N.playbackNotes([{ m: 60, t: 0, d: 1, h: 'L' }, { m: 60, t: 0.01, d: 2, h: 'R' }, { m: 62, t: 0, d: 1, h: 'R' }]);
+  assert.equal(p.filter(n => n.m === 60).length, 1);
+  assert.ok(Math.abs(p.find(n => n.m === 60).d - 2.01) < 1e-9);   // as long as the longer one
+  assert.equal(p.length, 2);
 });
 
 test('steps group chords and follow the chosen hand', () => {

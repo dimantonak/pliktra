@@ -507,7 +507,8 @@
     }));
     restart(from);   // a fresh start: no mistakes, no half-played chord
     var d = { from: from, to: to, t0: t0, notes: notes, ni: 0, si: from, speed: +settings.listenSpeed || 1,
-      out: demoOutput(), start: performance.now() + 150, nodes: [], timers: [], sent: {}, timer: 0, endMs: 0 };
+      out: demoOutput(), start: performance.now() + 150, nodes: [], timers: [], sent: {}, timer: 0, endMs: 0,
+      seq: 0, owner: {} };
     notes.forEach(function (n) { d.endMs = Math.max(d.endMs, demoAt(d, n.t) + n.d / d.speed * 1000); });
     demo = d;
     d.timer = setInterval(demoTick, 25);
@@ -522,7 +523,8 @@
     var now = performance.now();
     while (d.ni < d.notes.length && demoAt(d, d.notes[d.ni].t) <= now + 200) {   // schedule 200 ms ahead
       var n = d.notes[d.ni++], on = demoAt(d, n.t), off = on + Math.max(60, n.d / d.speed * 1000);
-      demoNote(d, n, on, off);
+      if (n.next != null) off = Math.min(off, demoAt(d, n.next) - 2);   // never into the same key's next note
+      demoNote(d, n, on, Math.max(on + 1, off));
     }
     var moved = false;
     while (d.si <= d.to && demoAt(d, st.steps[d.si].t) <= now) { st.idx = d.si++; moved = true; }
@@ -539,8 +541,12 @@
       } catch (e) { d.out = null; }   // piano went away: continue with the synth
     }
     if (!d.out) d.nodes.push(synth.play(n.m, (onMs - performance.now()) / 1000, (offMs - onMs) / 1000));
-    d.timers.push(setTimeout(function () { demoKeys[n.m] = n.h; dirty = true; }, Math.max(0, onMs - performance.now())));
-    d.timers.push(setTimeout(function () { delete demoKeys[n.m]; dirty = true; }, Math.max(0, offMs - performance.now() - 30)));
+    // The key lights up while it sounds; only this note's own release turns it off again.
+    var id = ++d.seq;
+    d.timers.push(setTimeout(function () { demoKeys[n.m] = n.h; d.owner[n.m] = id; dirty = true; }, Math.max(0, onMs - performance.now())));
+    d.timers.push(setTimeout(function () {
+      if (d.owner[n.m] === id) { delete demoKeys[n.m]; dirty = true; }
+    }, Math.max(0, Math.max(onMs, offMs - 30) - performance.now())));
   }
 
   // Silences the playback without moving the practice position.

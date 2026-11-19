@@ -106,13 +106,26 @@ function spelled(name) {
 function noteLabel(n) { return n.s || midiToName(n.m); }
 
 // For playback: copies of the notes where a key that is struck again is released just before
-// (otherwise the earlier note's release would cut the new one short). Notes must be sorted by time.
+// (otherwise the earlier note's release would cut the new one short). The same key struck twice
+// at (almost) the same time, e.g. by both hands or two tracks, is played once.
+// Each note gets `next`: when that key is struck again (null if never), so the player can make sure
+// a minimum length never reaches into the next note.
+var SAME_TIME = 0.03;   // seconds
 function playbackNotes(notes) {
-  var out = notes.map(function (n) { return { m: n.m, t: n.t, d: n.d, h: n.h }; });
+  var sorted = notes.map(function (n) { return { m: n.m, t: n.t, d: n.d, h: n.h, next: null }; })
+    .sort(function (a, b) { return a.t - b.t; });
+  var out = [], last = {};   // midi -> last kept note on that key
+  sorted.forEach(function (n) {
+    var p = last[n.m];
+    if (p && n.t - p.t < SAME_TIME) { p.d = Math.max(p.d, n.t + n.d - p.t); return; }   // played once
+    out.push(n);
+    last[n.m] = n;
+  });
   var next = {};   // midi -> start time of the next note on that key
   for (var i = out.length - 1; i >= 0; i--) {
     var n = out[i];
-    if (next[n.m] != null && n.t + n.d > next[n.m] - 0.01) n.d = Math.max(0.02, next[n.m] - n.t - 0.01);
+    n.next = next[n.m] != null ? next[n.m] : null;
+    if (n.next != null && n.t + n.d > n.next - 0.01) n.d = Math.max(0.01, n.next - n.t - 0.01);
     next[n.m] = n.t;
   }
   return out;

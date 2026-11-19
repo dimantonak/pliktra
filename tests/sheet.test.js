@@ -24,8 +24,13 @@ const EXTRA = [
   ['triplet-like lengths', 'C4_0.333 C4_0.333 C4_0.334 C4 D4 E4'],
   ['very short notes', 'C4_0.1 D4_0.1 E4_3.8'],
   ['2/4 with a whole-bar rest', '2/4 C4 | -_2'],
-  ['6/8', '6/8 C4_0.5 D4_0.5 E4_0.5 F4_1.5 | G4_3']
+  ['6/8', '6/8 C4_0.5 D4_0.5 E4_0.5 F4_1.5 | G4_3'],
+  ['dotted notes and rests, both hands', 'C3+E4_1.5 D4_0.5 C3+E4 F4 | G3+G4_0.75 F4_0.25 E3+E4_3 | C4_0.5 -_1.5 D4_2']
 ];
+
+// The drawn notes must have the same lengths as the layout (VexFlow only counts a dot when the
+// duration says so, e.g. 'qd'); otherwise notes after a dotted one drift and the hands don't line up.
+const VF = require('../vendor/vexflow/vexflow-bravura.js').Flow;
 
 test('built-in songs were found', () => {
   const app = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
@@ -46,6 +51,10 @@ for (const [title, text] of builtinSongs().concat(EXTRA)) {
       assert.ok(Math.abs(sum - barLen) < 1e-6, `bar ${i + 1} ${h}: ${sum} beats instead of ${barLen}`);
       let pos = bar.start;
       bar[h].forEach(it => { assert.ok(Math.abs(it.b - pos) < 1e-6, `bar ${i + 1} ${h}: gap or overlap at ${it.b}`); pos += it.len; });
+      bar[h].forEach(it => {
+        const ticks = Sheet.makeNote(VF, it, h === 'R' ? 'treble' : 'bass', h, {}).getTicks().value();
+        assert.equal(ticks, it.len * VF.RESOLUTION / 4, `bar ${i + 1} ${h}: drawn ${it.dur}${it.dotted ? ' dotted' : ''} has the wrong length`);
+      });
     }));
   });
 }

@@ -226,7 +226,7 @@ var Sheet = (function () {
     return { width: total * s, height: (bot - top) * s, marks: marks };
   }
 
-  return { available: available, render: render, beatKey: beatKey, layoutBars: layoutBars };
+  return { available: available, render: render, beatKey: beatKey, layoutBars: layoutBars, makeNote: makeNote };
 })();
 
 if (typeof module !== 'undefined') module.exports = { Sheet: Sheet };
