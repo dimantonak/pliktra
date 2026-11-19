@@ -92,6 +92,7 @@
   // Song title in the user's language (built-in songs are stored with English titles).
   function songName(s) {
     if (s && s.drill) return t('drillTitle', { name: t(Drills.level(s.drill).name) });
+    if (s && s.lesson) return t('lessonTitle', { name: t(Lessons.get(s.lesson).name) });
     var tr = s && s.kind === 'text' && BUILTIN_TITLES[LANG];
     return (tr && tr[s.title]) || (s ? s.title : '');
   }
@@ -158,7 +159,7 @@
     st.song = song;
     if (!(song && song.drill)) {   // note reading rounds are made fresh each time: not remembered
       store.set('pliktra.lastSong', song ? song.id : null);
-      if (song) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
+      if (song && !song.lesson) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
     }
     $('#songTitle').textContent = song ? songName(song) : t('noSong');
     showViewToggle();
@@ -248,6 +249,7 @@
   // Sheet music exists only for typed songs; MIDI files are always shown as falling notes.
   function sheetOn() { return (settings.view === 'sheet' || isDrill()) && !(st.song && st.song.kind !== 'text'); }
   function isDrill() { return !!(st.song && st.song.drill); }
+  function isLesson() { return !!(st.song && st.song.lesson); }
   // Reading mode: find the notes on the sheet music yourself. The screen keyboard shows the key to play
   // (and its finger) only after a wrong key, or when a note in the score is tapped (explanation card).
   function readingOn() { return (!!settings.reading || isDrill()) && sheetOn(); }   // note reading: always
@@ -273,11 +275,11 @@
         var oldData = sheetState.data, sameSong = sheetState.key.split('|')[0] === st.song.id && sheetState.key.slice(-st.song.text.length) === st.song.text;
         var keepHit = explain && oldData && sameSong ? oldData.hits.indexOf(explain.hit) : -1;
         try {
-          sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale, exact: isDrill() });
+          sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale, exact: !!st.song.exact });
           var room = geo.kbTop - 8;   // grew taller (very high/low notes)? draw it a bit smaller
           if (sheetState.data.height > room && scale > 0.5) {
             sheetState.data = Sheet.render($('#sheetSvg'), st.song.text,
-              { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height), exact: isDrill() });
+              { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height), exact: !!st.song.exact });
           }
           sheetState.key = key;
           var again = keepHit >= 0 && sheetState.data.hits[keepHit];
@@ -482,8 +484,9 @@
       var res = !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
       h = t('hintRound', { n: loop.laps, result: res });
     }
-    else if (!st.startTime && !st.finished) h = t(readingOn() ? 'hintRead' : 'hintStart');
+    else if (!st.startTime && !st.finished) h = isLesson() ? t(Lessons.get(st.song.lesson).tip) : t(readingOn() ? 'hintRead' : 'hintStart');
     $('#hint').textContent = h;
+    $('#hint').classList.toggle('long', h.length > 70);
   }
 
   function showResult() {
@@ -515,8 +518,15 @@
       var wl = el('div', 'result-note watch', watch.length ? t('drillWatch', { list: watch.map(function (w) { return localNoteName(w.name); }).join(', ') }) : t('drillAllRight'));
       $('#resBody').appendChild(wl);
     }
+    var nextLesson = isLesson() && Lessons.next(st.song.lesson);
+    if (isLesson()) {
+      var ls = Lessons.get(st.song.lesson), done = Lessons.status(ls, best) === 'done';
+      $('#resBody').appendChild(el('div', 'result-note' + (done ? ' best' : ''), done ? t('lessonDoneNote')
+        : t(st.hand !== 'B' && Lessons.hands(ls) === 'B' ? 'lessonAimBoth' : 'lessonAim', { p: Lessons.DONE })));
+    }
     $('#btnAgain').lastElementChild.textContent = t(isDrill() ? 'drillNew' : 'playAgain');
     $('#btnDrillFocus').hidden = !(isDrill() && watch.length);
+    $('#btnNextLesson').hidden = !nextLesson;
     openModal('mResult');
     releaseWakeLock();
   }
@@ -525,10 +535,13 @@
   // A fresh round of the level; focus = notes to practise more ([{ name, hand }]).
   function startDrill(id, focus) {
     var text = Drills.generate(id, { focus: focus });
-    st.hand = 'B';   // a round may use both hands
-    document.querySelectorAll('#handSeg button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-hand') === 'B'); });
+    useBothHands();   // a round may use both hands
     closeAll();
-    loadSong({ id: 'drill:' + id, title: '', kind: 'text', text: text, notes: parseSongText(text).notes, drill: id });
+    loadSong({ id: 'drill:' + id, title: '', kind: 'text', text: text, notes: parseSongText(text).notes, drill: id, exact: true });
+  }
+  function useBothHands() {
+    st.hand = 'B';
+    document.querySelectorAll('#handSeg button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-hand') === 'B'); });
   }
   // The notes read wrong in this round, low to high: [{ name: "F#4", hand }]
   function drillWatch() {
@@ -554,6 +567,40 @@
       pick.appendChild(el('span', 'name', (i + 1) + '. ' + t(lv.name)));
       pick.appendChild(el('span', 'meta', Drills.describe(lv) + bestLabel({ id: 'drill:' + lv.id })));
       pick.onclick = function () { startDrill(lv.id); };
+      li.appendChild(pick);
+      ul.appendChild(li);
+    });
+    det.appendChild(ul);
+    return det;
+  }
+
+  // ---------------------------------------------------------------- lessons (js/lessons.js)
+  function startLesson(id) {
+    useBothHands();   // written for both hands; one hand can still be picked afterwards
+    closeAll();
+    loadSong(Lessons.song(id));
+  }
+  // The "Lessons" section of the song list: ○ new, ◐ tried, ✓ learnt.
+  function lessonSectionEl() {
+    var det = el('details', 'section lessons');
+    det.open = sectionOpen.lessons != null ? sectionOpen.lessons : isLesson();
+    var sum = el('summary', '', t('lessonSection'));
+    sum.addEventListener('click', function () { sectionOpen.lessons = !det.open; });
+    det.appendChild(sum);
+    det.appendChild(el('p', 'muted small', t('lessonIntro', { p: Lessons.DONE })));
+    var ul = el('ul', 'songlist');
+    Lessons.LIST.forEach(function (ls, i) {
+      var li = el('li', st.song && st.song.lesson === ls.id ? 'current' : '');
+      var pick = el('button', 'pick'), status = Lessons.status(ls, best);
+      pick.type = 'button';
+      var name = el('span', 'name');
+      var mark = el('span', 'mark ' + status, Lessons.MARK[status]);
+      mark.title = t(status === 'new' ? 'lessonNew' : status === 'tried' ? 'lessonTried' : 'lessonDone');
+      name.appendChild(mark);
+      name.appendChild(document.createTextNode(' ' + (i + 1) + '. ' + t(ls.name)));
+      pick.appendChild(name);
+      pick.appendChild(el('span', 'meta', t(ls.desc) + bestLabel({ id: 'lesson:' + ls.id })));
+      pick.onclick = function () { startLesson(ls.id); };
       li.appendChild(pick);
       ul.appendChild(li);
     });
@@ -1288,6 +1335,7 @@
     box.innerHTML = '';
     $('#libHint').hidden = !songs.length;
     box.appendChild(drillSectionEl());
+    box.appendChild(lessonSectionEl());
     if (!songs.length) { box.appendChild(el('p', 'muted', t('noSongs'))); return; }
     var ordered = songs.slice().sort(function (a, b) { return (b.recent || 0) - (a.recent || 0); });
     var loose = [], starters = [], groups = [], byName = {};
@@ -1819,6 +1867,7 @@
     closeModal('mResult'); restart(st.startIdx);   // same section again
   };
   $('#btnDrillFocus').onclick = function () { if (isDrill()) startDrill(st.song.drill, drillWatch()); };
+  $('#btnNextLesson').onclick = function () { var n = isLesson() && Lessons.next(st.song.lesson); if (n) startLesson(n.id); };
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
   // Don't leave the practice bar focused: Space/Enter would press the last button again.
@@ -1859,7 +1908,10 @@
   if (window.ResizeObserver) new ResizeObserver(resize).observe(cv.parentElement);
   resize();
   var lastId = store.get('pliktra.lastSong', null);
-  if (!importFromHash()) loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || songs[0] || null);
+  if (!importFromHash()) {
+    var lastLesson = /^lesson:(.+)$/.exec(lastId || '');
+    loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || (lastLesson && Lessons.song(lastLesson[1])) || songs[0] || null);
+  }
   initMidi();
   requestAnimationFrame(frame);
   // Offline use / install as an app (only on the website: service workers need https).

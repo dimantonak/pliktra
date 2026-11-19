@@ -7,6 +7,7 @@ const path = require('node:path');
 // sheet.js is a browser script that uses notation.js's globals.
 Object.assign(globalThis, require('../js/notation.js'));
 const { Sheet } = require('../js/sheet.js');
+const { Lessons } = require('../js/lessons.js');
 
 // Built-in songs, read from app.js so new ones are tested automatically.
 function builtinSongs() {
@@ -43,11 +44,12 @@ test('built-in songs were found', () => {
   assert.equal(builtinSongs().length, declared, 'some built-in songs could not be read by this test');
 });
 
-for (const [title, text] of builtinSongs().concat(EXTRA)) {
+const LESSONS = Lessons.LIST.map(l => ['lesson ' + l.id, l.text, l.exact]);
+for (const [title, text, exact] of builtinSongs().concat(EXTRA, LESSONS)) {
   test('every bar adds up: ' + title, () => {
     const p = parseSongText(text);
     assert.equal(p.errors.length, 0, p.errors.join('; '));
-    const lay = Sheet.layoutBars(p);
+    const lay = Sheet.layoutBars(p, exact);
     const barLen = p.meter[0] * 4 / p.meter[1];
     lay.bars.forEach((bar, i) => {   // only a pickup bar and the matching last bar may be short
       const ok = Math.abs(bar.len - barLen) < 1e-6 || (p.pickup && (i === 0 ? Math.abs(bar.len - p.pickup) < 1e-6

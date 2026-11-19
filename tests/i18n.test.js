@@ -22,7 +22,7 @@ test('every key used in index.html and the scripts exists', () => {
   const html = read('index.html');
   const used = new Set();
   for (const m of html.matchAll(/data-i18n(?:-html|-title|-aria|-ph)?="(\w+)"/g)) used.add(m[1]);
-  for (const f of ['js/app.js', 'js/notation.js', 'js/midifile.js', 'js/explain.js', 'js/drills.js']) {
+  for (const f of ['js/app.js', 'js/notation.js', 'js/midifile.js', 'js/explain.js', 'js/drills.js', 'js/lessons.js']) {
     for (const m of read(f).matchAll(/\bt\('(\w+)'/g)) used.add(m[1]);
   }
   const unknown = [...used].filter(k => L.I18N.en[k] == null);

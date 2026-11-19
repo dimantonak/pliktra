@@ -382,6 +382,9 @@ body {
   pointer-events: none;
 }
 .hint:empty { display: none; }
+.hint.long { width: min(560px, calc(100% - 32px)); border-radius: 14px; font-size: 14.5px; line-height: 1.4; }
+.songlist .mark { display: inline-block; width: 1.1em; text-align: center; color: var(--muted); }
+.songlist .mark.done { color: var(--good); font-weight: 700; }
 
 /* explanation card: tap a symbol in the sheet music */
 #sheetInner { cursor: pointer; }

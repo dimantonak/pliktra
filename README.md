@@ -63,6 +63,10 @@ and **restore** it later or on another device.
   middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
   can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
   missed, and *Practise these notes* makes a round with more of them.
+- **Lessons** (Songs → *Lessons*): six short exercises for the hands, one skill each: the five-finger
+  position, alternating hands, thumb under, hold and move, the scale in contrary motion, and major and
+  minor chords. Each one starts with a one-sentence instruction. ○ not tried yet, ◐ tried,
+  ✓ learnt (95% or more); *Next lesson* in the result leads on to the next one.
 - **Reading mode** (👁 Read, with the sheet music): the screen keyboard no longer shows which key to play,
   so you read the notes from the sheet music instead. After a wrong key the right one lights up; tapping a
   note in the score shows its keys too.
@@ -99,6 +103,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
 - `js/drills.js` - note reading drills (generates the rounds)
+- `js/lessons.js` - the lessons (technique exercises) and their progress
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
 - `tests/` - automated tests: `node --test tests/`
