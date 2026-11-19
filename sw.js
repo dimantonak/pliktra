@@ -38,8 +38,10 @@ self.addEventListener('fetch', function (e) {
       if (res.ok) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { return c.put(req, copy); });
+        finish(res);
+      } else {   // server error or missing file: the saved copy is better than an error page
+        saved().then(function (hit) { finish(hit || res); });
       }
-      finish(res);
     }, function (err) {   // offline
       clearTimeout(timer);
       saved().then(function (hit) { if (hit) finish(hit); else if (!done) { done = true; reject(err); } });

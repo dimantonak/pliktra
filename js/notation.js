@@ -105,6 +105,19 @@ function spelled(name) {
 
 function noteLabel(n) { return n.s || midiToName(n.m); }
 
+// For playback: copies of the notes where a key that is struck again is released just before
+// (otherwise the earlier note's release would cut the new one short). Notes must be sorted by time.
+function playbackNotes(notes) {
+  var out = notes.map(function (n) { return { m: n.m, t: n.t, d: n.d, h: n.h }; });
+  var next = {};   // midi -> start time of the next note on that key
+  for (var i = out.length - 1; i >= 0; i--) {
+    var n = out[i];
+    if (next[n.m] != null && n.t + n.d > next[n.m] - 0.01) n.d = Math.max(0.02, next[n.m] - n.t - 0.01);
+    next[n.m] = n.t;
+  }
+  return out;
+}
+
 // Error text in the app's language (js/i18n.js), or English when it isn't loaded (e.g. in tests).
 function msg(key, tok, english) {
   if (typeof t === 'function') return t(key, { tok: tok });
@@ -144,5 +157,5 @@ function buildSteps(notes, hand) {
 if (typeof module !== 'undefined') {
   module.exports = { isBlack: isBlack, midiToName: midiToName, parseNoteName: parseNoteName,
     parseSongText: parseSongText, buildSteps: buildSteps, sortNotes: sortNotes,
-    spelled: spelled, noteLabel: noteLabel, BEAT_SEC: BEAT_SEC, CHORD_TOLERANCE: CHORD_TOLERANCE };
+    spelled: spelled, noteLabel: noteLabel, playbackNotes: playbackNotes, BEAT_SEC: BEAT_SEC, CHORD_TOLERANCE: CHORD_TOLERANCE };
 }

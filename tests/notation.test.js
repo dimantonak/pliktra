@@ -49,6 +49,15 @@ test('same key twice in a chord counts once, finger kept', () => {
   assert.equal(r.notes.find(n => n.m === 60).f, 1);
 });
 
+test('playback: a key struck again is released just before', () => {
+  const notes = [{ m: 60, t: 0, d: 1, h: 'R' }, { m: 64, t: 0, d: 2, h: 'R' }, { m: 60, t: 0.5, d: 0.4, h: 'R' }];
+  const p = N.playbackNotes(notes);
+  assert.ok(p[0].t + p[0].d < 0.5, 'first C4 ends before the second starts');
+  assert.equal(p[1].d, 2);              // other keys unchanged
+  assert.equal(p[2].d, 0.4);
+  assert.equal(notes[0].d, 1);          // the song itself is not changed
+});
+
 test('steps group chords and follow the chosen hand', () => {
   const r = N.parseSongText('C3+E4 D4 L:G2');
   const both = N.buildSteps(r.notes, 'B');

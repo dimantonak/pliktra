@@ -28,7 +28,11 @@ const EXTRA = [
 ];
 
 test('built-in songs were found', () => {
-  assert.ok(builtinSongs().length >= 4);
+  const app = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
+  const block = app.slice(app.indexOf('var BUILTIN = ['), app.indexOf('var FIRST_BUILTINS'));
+  const declared = (block.match(/\{ title: /g) || []).length;
+  assert.ok(declared >= 4);
+  assert.equal(builtinSongs().length, declared, 'some built-in songs could not be read by this test');
 });
 
 for (const [title, text] of builtinSongs().concat(EXTRA)) {

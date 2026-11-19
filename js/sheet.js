@@ -94,13 +94,14 @@ var Sheet = (function () {
   function makeNote(VF, it, clef, hand, opts) {
     if (it.rest) {
       var rk = it.whole ? (clef === 'treble' ? 'd/5' : 'f/3') : (clef === 'treble' ? 'b/4' : 'd/3');
-      var rn = new VF.StaveNote({ clef: clef, keys: [rk], duration: it.dur + 'r', align_center: !!it.whole });
+      var rn = new VF.StaveNote({ clef: clef, keys: [rk], duration: it.dur + (it.dotted ? 'd' : '') + 'r', align_center: !!it.whole });
       if (it.whole) rn.setIntrinsicTicks(it.len * VF.RESOLUTION / 4);   // whole-bar rest lasts one bar (e.g. 3 beats in 3/4)
       if (it.dotted) VF.Dot.buildAndAttach([rn], { all: true });
       return rn;
     }
     var sorted = it.notes.slice().sort(function (a, b) { return a.m - b.m; });
-    var sn = new VF.StaveNote({ clef: clef, keys: sorted.map(vfKey), duration: it.dur, auto_stem: true });
+    var sn = new VF.StaveNote({ clef: clef, keys: sorted.map(vfKey), duration: it.dur + (it.dotted ? 'd' : ''),   // 'd' = dotted length; the dot itself is drawn by Dot.buildAndAttach
+      auto_stem: true });
     if (it.dotted) VF.Dot.buildAndAttach([sn], { all: true });
     return sn;
   }
@@ -151,6 +152,9 @@ var Sheet = (function () {
     ctx.scale(s, s);
 
     var marks = {}, pending = [], x = 15, last = lay.bars.length - 1, minY = 0, maxY = H;
+    // Compound meters (3/8, 6/8, 9/8, 12/8): eighth notes are beamed in groups of three.
+    var compound = lay.meter[1] === 8 && lay.meter[0] % 3 === 0;
+    var beamOpts = compound ? { groups: [new VF.Fraction(3, 8)] } : undefined;
     lay.bars.forEach(function (bar, i) {
       var w = widths[i];
       var sT = new VF.Stave(x, YT, w), sB = new VF.Stave(x, YB, w);
@@ -177,7 +181,7 @@ var Sheet = (function () {
         var voice = new VF.Voice({ num_beats: lay.meter[0], beat_value: lay.meter[1] }).setMode(VF.Voice.Mode.SOFT);
         voice.addTickables(notes);
         VF.Accidental.applyAccidentals([voice], 'C');
-        extras = extras.concat(VF.Beam.generateBeams(notes));
+        extras = extras.concat(VF.Beam.generateBeams(notes, beamOpts));
         items.forEach(function (it, k) {
           if (it.tieNext && notes[k + 1]) {
             var idx = it.notes.map(function (_, j) { return j; });

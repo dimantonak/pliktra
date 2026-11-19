@@ -502,9 +502,9 @@
     var from = st.idx >= st.steps.length ? (loopOn() ? loop.a : 0) : st.idx;
     var to = loopOn() && from <= loop.b ? loop.b : st.steps.length - 1;
     var t0 = st.steps[from].t, t1 = st.steps[to].t + CHORD_TOLERANCE;
-    var notes = st.song.notes.filter(function (n) {
+    var notes = playbackNotes(st.song.notes.filter(function (n) {
       return n.t >= t0 - 0.001 && n.t <= t1 && (st.hand === 'B' || n.h === st.hand);
-    });
+    }));
     restart(from);   // a fresh start: no mistakes, no half-played chord
     var d = { from: from, to: to, t0: t0, notes: notes, ni: 0, si: from, speed: +settings.listenSpeed || 1,
       out: demoOutput(), start: performance.now() + 150, nodes: [], timers: [], sent: {}, timer: 0, endMs: 0 };
@@ -873,7 +873,7 @@
   function closeAll() { ['mLibrary', 'mEditor', 'mImport', 'mResult', 'mSettings'].forEach(closeModal); }
 
   document.querySelectorAll('[data-close]').forEach(function (b) {
-    b.addEventListener('click', function () { closeModal(b.closest('.modal').id); });
+    b.addEventListener('click', function () { dismissModal(b.closest('.modal').id); });   // asks if the editor has changes
   });
 
   // Escape or a tap outside the dialog closes it (the editor asks first if something changed).
@@ -1287,7 +1287,7 @@
   // Loop: 1st tap = start here, 2nd tap = end here (after moving the slider or playing on), 3rd tap = off.
   $('#btnLoop').onclick = function () {
     if (!st.steps.length) return;
-    if (loopOn()) { clearLoop(); updateStats(); updateHint(); return; }
+    if (loopOn()) { stopDemo(); clearLoop(); updateStats(); updateHint(); return; }
     var here = Math.min(st.idx, st.steps.length - 1);
     if (!loop.pending) { endDemo(); loop.pending = true; loop.a = here; showLoopToggle(); updateHint(); return; }
     var a = Math.min(loop.a, here), b = Math.max(loop.a, here);
