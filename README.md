@@ -31,6 +31,8 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
 - **Song list**: tap a song to practise it; the songs you played most recently are at the top.
   The starter songs are folded away once you have your own. **⋯** next to a song edits, shares,
   duplicates (e.g. to make an easier version) or deletes it.
+- **Groups**: give songs a book or group name (in the editor or under ⋯), e.g. one per lesson book.
+  Each group is a foldable section with *Share this group as a link*; the songs arrive grouped on the other device.
 - **Song links**: *⋯ → Share as link* on a typed song makes a link; opening it on another device adds the song there.
   The song is inside the link itself (after `#`), so it is never stored on the website or in this repository.
 

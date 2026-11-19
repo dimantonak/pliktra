@@ -885,7 +885,8 @@
 
   // Escape or a tap outside the dialog closes it (the editor asks first if something changed).
   function editorChanged() {
-    return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? songName(editing) : '');
+    return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? songName(editing) : '') ||
+      $('#edGroup').value.trim() !== edGroupStart;
   }
   function dismissModal(id) {
     if (id === 'mEditor' && editorChanged() && !confirm(t('confirmCloseEditor'))) return;
@@ -934,27 +935,65 @@
   function isStarter(s) {
     return s.kind === 'text' && BUILTIN.some(function (b) { return b.title === s.title && b.text === s.text; });
   }
-  var startersOpen = null;   // the user opened/closed the starter songs (this visit only)
+  var sectionOpen = {};   // section -> opened/closed by the user (this visit only)
 
   // Tap a song to practise it; ⋯ opens its other actions. Most recently played or added first.
+  // Songs without a group come first, then one foldable section per group (book, lesson, ...),
+  // the most recently used group first, then the starter songs.
   function renderLibrary() {
     var box = $('#songList');
     box.innerHTML = '';
     $('#libHint').hidden = !songs.length;
     if (!songs.length) { box.appendChild(el('p', 'muted', t('noSongs'))); return; }
     var ordered = songs.slice().sort(function (a, b) { return (b.recent || 0) - (a.recent || 0); });
-    var own = ordered.filter(function (s) { return !isStarter(s); });
-    var starters = ordered.filter(isStarter);
-    if (!own.length || !starters.length) { box.appendChild(songListEl(ordered)); return; }
-    box.appendChild(songListEl(own));
-    var det = el('details', 'starters');
-    det.open = startersOpen != null ? startersOpen : !!(st.song && isStarter(st.song));
-    var sum = el('summary', '', t('starterSongs', { n: starters.length }));
+    var loose = [], starters = [], groups = [], byName = {};
+    ordered.forEach(function (s) {
+      if (s.group) {
+        if (!byName[s.group]) groups.push(byName[s.group] = { name: s.group, songs: [] });
+        byName[s.group].songs.push(s);
+      } else if (isStarter(s)) starters.push(s);
+      else loose.push(s);
+    });
+    if (!groups.length && (!loose.length || !starters.length)) { box.appendChild(songListEl(ordered)); return; }
+    if (loose.length) box.appendChild(songListEl(loose));
+    groups.forEach(function (g) { box.appendChild(sectionEl('g:' + g.name, g.name + ' (' + g.songs.length + ')', g.songs, g.name)); });
+    if (starters.length) box.appendChild(sectionEl('starters', t('starterSongs', { n: starters.length }), starters, null));
+  }
+
+  // A foldable section; open when the song being practised is in it, unless the user chose otherwise.
+  function sectionEl(key, label, list, groupName) {
+    var det = el('details', 'section');
+    det.open = sectionOpen[key] != null ? sectionOpen[key] : list.indexOf(st.song) >= 0;
+    var sum = el('summary', '', label);
     // Only the user's own tap counts (setting det.open above also fires a "toggle" event, later).
-    sum.addEventListener('click', function () { startersOpen = !det.open; });
+    sum.addEventListener('click', function () { sectionOpen[key] = !det.open; });
     det.appendChild(sum);
-    det.appendChild(songListEl(starters));
-    box.appendChild(det);
+    det.appendChild(songListEl(list));
+    var typed = list.filter(function (s) { return s.kind !== 'midi'; });
+    if (groupName && typed.length) {
+      var share = el('button', 'btn small share-group', t('shareGroup'));
+      share.type = 'button';
+      share.onclick = function () {
+        shareLink(typed.map(function (s) { return songEntry(s, false); }), groupName,
+          typed.length === 1 ? t('quote', { t: songName(typed[0]) }) : t('theseSongs', { n: typed.length }));
+      };
+      det.appendChild(share);
+    }
+    return det;
+  }
+
+  // Groups: an optional name per song (a book, a lesson, "Christmas"...). Empty = no group.
+  var GROUP_MAX = 60;
+  function setGroup(s, name) {
+    name = String(name || '').trim().slice(0, GROUP_MAX);
+    if (name) s.group = name; else delete s.group;
+  }
+  function fillGroupNames() {
+    var dl = $('#groupNames'), seen = {};
+    dl.innerHTML = '';
+    songs.forEach(function (s) {
+      if (s.group && !seen[s.group]) { seen[s.group] = true; var o = el('option'); o.value = s.group; dl.appendChild(o); }
+    });
   }
 
   function songListEl(list) {
@@ -986,8 +1025,15 @@
     $('#mSongName').textContent = songName(s);
     $('#saEdit').textContent = t(s.kind === 'midi' ? 'rename' : 'edit');
     $('#saShare').hidden = s.kind === 'midi';   // MIDI files are too big for a link
+    $('#saGroup').value = s.group || '';
+    fillGroupNames();
     openModal('mSong');
   }
+  $('#saGroup').addEventListener('input', function () {
+    setGroup(actionSong, $('#saGroup').value);
+    saveSongs();
+    renderLibrary();
+  });
   $('#saEdit').onclick = function () {
     var s = actionSong;
     closeModal('mSong');
@@ -1002,6 +1048,7 @@
       ? { id: newId(), title: '', kind: 'midi', notes: JSON.parse(JSON.stringify(s.notes)) }
       : songFromText('', s.text);
     copy.title = t('copyTitle', { t: songName(s) });
+    setGroup(copy, s.group);
     copy.recent = Date.now();
     songs.unshift(copy);
     if (!saveSongs()) { songs.shift(); return; }
@@ -1047,14 +1094,15 @@
     }
     prompt(t('copyLink'), url);
   }
-  function shareSong(song) { shareLink({ t: song.title, s: song.text }, songName(song), t('quote', { t: songName(song) })); }
+  function shareSong(song) { shareLink(songEntry(song, false), songName(song), t('quote', { t: songName(song) })); }
 
   // Song entries in links and backup files: typed {t, s}, MIDI {t, k: 'midi', n: [[m, t, d, h], ...]},
-  // plus b = best scores {B, R, L} in backup files.
+  // plus g = group name (optional) and b = best scores {B, R, L} in backup files.
   function songEntry(s, withBest) {
     var e = s.kind === 'midi'
       ? { t: s.title, k: 'midi', n: s.notes.map(function (n) { return [n.m, n.t, n.d, n.h]; }) }
       : { t: s.title, s: s.text };
+    if (s.group) e.g = s.group;
     if (withBest) {
       var b = {};
       ['B', 'R', 'L'].forEach(function (h) { if (best[s.id + ':' + h] != null) b[h] = best[s.id + ':' + h]; });
@@ -1063,7 +1111,7 @@
     return e;
   }
   function entryValid(d) {
-    if (!d || typeof d.t !== 'string') return false;
+    if (!d || typeof d.t !== 'string' || (d.g != null && typeof d.g !== 'string')) return false;
     if (d.k === 'midi') {
       return Array.isArray(d.n) && d.n.length > 0 && d.n.length <= 50000 && d.n.every(function (x) {
         return Array.isArray(x) && x.length === 4 && typeof x[0] === 'number' && x[0] >= 0 && x[0] <= 127 &&
@@ -1116,6 +1164,7 @@
       toUpdate.forEach(function (u) { if (!u.isMidi) u.song.text = u.d.s; u.song.notes = u.notes; });
       var created = toAdd.map(function (x) {
         x.song = x.isMidi ? { id: newId(), title: x.title, kind: 'midi', notes: x.notes } : songFromText(x.title, x.d.s);
+        setGroup(x.song, x.d.g);
         return x.song;
       });
       var now = Date.now();
@@ -1131,6 +1180,10 @@
     }
     same.concat(toUpdate, toAdd).forEach(mergeBest);
     store.set('pliktra.best', best);
+    // Songs already here take the group from the link/backup if they don't have one yet.
+    var grouped = same.concat(toUpdate).filter(function (x) { return x.d.g && !x.song.group; });
+    grouped.forEach(function (x) { setGroup(x.song, x.d.g); });
+    if (grouped.length) saveSongs();
     var first = toAdd[0] || toUpdate[0] || same[0];
     return first ? first.song : null;
   }
@@ -1180,12 +1233,16 @@
   window.addEventListener('hashchange', importFromHash);
 
   // ---------------------------------------------------------------- editor
-  var editing = null, recording = false, chordStart = 0;
+  var editing = null, recording = false, chordStart = 0, edGroupStart = '';
 
   function openEditor(song) {
     editing = song || null;
     $('#edTitle').value = song ? songName(song) : '';   // built-in songs: title in the user's language
     $('#edText').value = song ? song.text : '';
+    // A new song goes into the same group as the song being practised (handy when typing in a whole book).
+    edGroupStart = (song ? song.group : st.song && st.song.group) || '';
+    $('#edGroup').value = edGroupStart;
+    fillGroupNames();
     $('#edError').textContent = '';
     setRecording(false);
     validateEditor();
@@ -1238,6 +1295,7 @@
     var song = editing;
     if (song) { song.title = title; song.text = $('#edText').value; song.notes = r.notes; }
     else { song = songFromText(title, $('#edText').value); songs.unshift(song); }
+    setGroup(song, $('#edGroup').value);
     if (!saveSongs()) return;
     closeAll();
     loadSong(song);

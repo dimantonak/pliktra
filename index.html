@@ -64,10 +64,13 @@
     </div>
   </div>
 
+  <datalist id="groupNames"></datalist>
+
   <!-- One song's actions (the ⋯ button in the song list) -->
   <div class="modal" id="mSong">
     <div class="sheet narrow" role="dialog" aria-modal="true" aria-labelledby="mSongName">
       <div class="sheet-head"><h2 id="mSongName"></h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
+      <label class="field"><span data-i18n="groupLabel">Book or group (optional)</span><input id="saGroup" type="text" list="groupNames" maxlength="60" autocomplete="off" placeholder="e.g. Piano book 1" data-i18n-ph="groupPh"></label>
       <div class="actions">
         <button id="saEdit" class="btn">Edit</button>
         <button id="saShare" class="btn" data-i18n="shareLinkBtn">Share as link</button>
@@ -81,7 +84,10 @@
   <div class="modal" id="mEditor">
     <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="mEditorTitle">
       <div class="sheet-head"><h2 id="mEditorTitle" data-i18n="editor">Song editor</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
-      <label class="field"><span data-i18n="title">Title</span><input id="edTitle" type="text" placeholder="e.g. Ode to Joy" data-i18n-ph="titlePh"></label>
+      <div class="row gap fields">
+        <label class="field"><span data-i18n="title">Title</span><input id="edTitle" type="text" placeholder="e.g. Ode to Joy" data-i18n-ph="titlePh"></label>
+        <label class="field"><span data-i18n="groupLabel">Book or group (optional)</span><input id="edGroup" type="text" list="groupNames" maxlength="60" autocomplete="off" placeholder="e.g. Piano book 1" data-i18n-ph="groupPh"></label>
+      </div>
       <label class="field"><span data-i18n="notes">Notes</span><textarea id="edText" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="C4 D4 E4 F4 G4_2"></textarea></label>
       <div class="row gap">
         <button id="btnRecord" class="btn rec" data-i18n="record">&#9679; Record from piano</button>

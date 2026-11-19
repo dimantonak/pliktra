@@ -222,8 +222,10 @@ textarea { font-family: ui-monospace, Consolas, monospace; resize: vertical; }
 .songlist .name { font-weight: 600; overflow-wrap: anywhere; }
 .songlist .meta { font-size: 13px; color: var(--muted); }
 .songlist .more { flex: none; font-size: 20px; background: none; border-color: transparent; }
-.starters summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 6px 2px; }
-.starters .songlist { margin-top: 4px; }
+.section summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 6px 2px; overflow-wrap: anywhere; }
+.section .songlist { margin-top: 4px; }
+.section .share-group { margin: 8px 0 4px; }
+.fields .field { flex: 1 1 220px; }
 .sheet.narrow { width: min(380px, 100%); }
 .sheet-head { gap: 10px; }
 .sheet-head h2 { overflow-wrap: anywhere; min-width: 0; }
