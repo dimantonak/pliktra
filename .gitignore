@@ -8,3 +8,7 @@
 
 # song backups (may contain copyrighted songs)
 pliktra-songs-*.json
+
+# notes for AI assistants: kept local only
+AGENTS.md
+CLAUDE.md

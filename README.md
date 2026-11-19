@@ -63,7 +63,6 @@ and also works without internet (the newest version is loaded whenever you are o
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
 - `tests/` - automated tests: `node --test tests/`
-- `AGENTS.md` - background and rules for contributors and AI assistants
 
 No build step and no dependencies to install: plain HTML + JavaScript.
 To host your own copy, put the folder on any https web host (e.g. GitHub Pages);
