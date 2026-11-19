@@ -3,8 +3,9 @@
   'use strict';
 
   var $ = function (s) { return document.querySelector(s); };
-  var HAND_COLOR = { R: '#4f9dff', L: '#ffa94d' };
-  var HAND_SOFT = { R: '#b9d7ff', L: '#ffdcb5' };
+  var HAND_COLOR = { R: '#4c9aff', L: '#f59f45' };
+  var HAND_DEEP = { R: '#2672e0', L: '#d9761c' };
+  var HAND_SOFT = { R: '#c8e0ff', L: '#ffe0b8' };
 
   // ---------------------------------------------------------------- storage
   var store = {
@@ -212,7 +213,7 @@
     var box = $('#sheet'), inner = $('#sheetInner'), msgEl = $('#sheetMsg');
     var sheetLib = typeof Sheet !== 'undefined' && Sheet.available();
     box.hidden = !sheetOn();
-    $('#hint').style.top = sheetOn() && geo ? (geo.kbTop - 36) + 'px' : '';
+    $('#hint').style.top = sheetOn() && geo ? Math.max(12, geo.kbTop - 52) + 'px' : '';
     $('#hint').classList.toggle('on-paper', sheetOn());   // dark text on the light score
     dirty = true;
     if (!sheetOn() || !geo) return;
@@ -649,10 +650,19 @@
     var laneH = geo.kbTop;
     ctx.clearRect(0, 0, W, H);
 
-    // lane background + octave guides at every C
-    ctx.fillStyle = '#101318';
+    // studio lane backdrop + subtle black-key lane shading + octave guides at every C
+    var bgGrad = ctx.createLinearGradient(0, 0, 0, laneH);
+    bgGrad.addColorStop(0, '#12151c');
+    bgGrad.addColorStop(1, '#0b0d12');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, laneH);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+    for (var bl = geo.lo; bl <= geo.hi; bl++) {
+      if (!isBlack(bl)) continue;
+      var br = keyRect(bl);
+      ctx.fillRect(br.x, 0, br.w, laneH);
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.055)';
     for (var i = 0; i < geo.whites.length; i++) {
       var wm = geo.whites[i];
       if (wm % 12 === 0) ctx.fillRect(Math.round(keyRect(wm).x), 0, 1, laneH);
@@ -665,7 +675,7 @@
       var notes = st.song.notes;
       ctx.save();
       ctx.beginPath(); ctx.rect(0, 0, W, laneH); ctx.clip();
-      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.font = '600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       for (var k = firstNoteAtOrAfter(notes, step.t - 0.001); k < notes.length; k++) {
         var n = notes[k];
@@ -677,30 +687,42 @@
         var r = keyRect(n.m);
         var yb = laneH - (n.t - st.viewT) * pps;
         var showFinger = settings.fingers && active && n.f;
-        var h = Math.max(n.d * pps - 3, showFinger ? 24 : 14);
-        ctx.globalAlpha = !active ? 0.28 : done ? 0.35 : 1;
-        ctx.fillStyle = active ? HAND_COLOR[n.h] : '#7a8394';
-        if (isCur && !done) { ctx.shadowColor = HAND_COLOR[n.h]; ctx.shadowBlur = 14; }
-        rr(r.x + 1.5, yb - h, r.w - 3, h, 5);
+        var h = Math.max(n.d * pps - 3, showFinger ? 26 : 15);
+        ctx.globalAlpha = !active ? 0.25 : done ? 0.34 : 1;
+        if (active) {
+          var ng = ctx.createLinearGradient(0, yb - h, 0, yb);
+          ng.addColorStop(0, HAND_COLOR[n.h]);
+          ng.addColorStop(1, HAND_DEEP[n.h]);
+          ctx.fillStyle = ng;
+        } else {
+          ctx.fillStyle = '#6f7889';
+        }
+        if (isCur && !done) { ctx.shadowColor = HAND_COLOR[n.h]; ctx.shadowBlur = 16; }
+        rr(r.x + 1.5, yb - h, r.w - 3, h, 6);
         ctx.fill();
         ctx.shadowBlur = 0;
-        var labelY = yb - 3, nameFits = true;
+        if (active && h >= 10) {   // subtle top rim highlight
+          ctx.fillStyle = isCur && !done ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.22)';
+          rr(r.x + 2.5, yb - h + 1, Math.max(2, r.w - 5), 2.5, 2);
+          ctx.fill();
+        }
+        var labelY = yb - 4, nameFits = true;
         if (showFinger) {
           var rad = Math.min(r.w * 0.36, 11, (h - 4) / 2);
-          var cy = yb - rad - 3;
-          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          var cy = yb - rad - 3.5;
+          ctx.fillStyle = 'rgba(255,255,255,0.96)';
           ctx.beginPath(); ctx.arc(r.x + r.w / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#0b1220';
-          ctx.font = '800 ' + Math.round(rad * 1.35) + 'px system-ui, sans-serif';
+          ctx.fillStyle = '#0c111a';
+          ctx.font = '800 ' + Math.round(rad * 1.35) + 'px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
           ctx.textBaseline = 'middle';
-          ctx.fillText(String(n.f), r.x + r.w / 2, cy + 1);
+          ctx.fillText(String(n.f), r.x + r.w / 2, cy + 0.5);
           ctx.textBaseline = 'bottom';
-          ctx.font = '600 12px system-ui, sans-serif';
+          ctx.font = '600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
           labelY = cy - rad - 2;
           nameFits = h >= rad * 2 + 20;
         }
         if (settings.laneLabels && active && r.w >= 16 && nameFits) {
-          ctx.fillStyle = '#0b1220';
+          ctx.fillStyle = '#0c111a';
           var label = localNoteName(r.w >= 30 ? noteLabel(n) : noteLabel(n).replace(/-?\d+$/, ''));
           ctx.fillText(label, r.x + r.w / 2, labelY);
         }
@@ -709,64 +731,145 @@
       ctx.globalAlpha = 1;
     }
 
-    // hit line
-    ctx.fillStyle = 'rgba(79,157,255,0.55)';
-    ctx.fillRect(0, laneH - 2, W, 2);
+    // subtle glowing horizon line in falling-notes mode
+    if (!sheetOn()) {
+      ctx.fillStyle = 'rgba(76, 154, 255, 0.45)';
+      ctx.fillRect(0, laneH - 2, W, 2);
+    }
 
     drawKeyboard(now, step);
   }
 
   function keyState(m, now, step) {
-    if (wrong[m] && now - wrong[m] < 380) return { fill: '#ff5c5c', strong: true };
-    if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], strong: true };   // sounding in Listen
+    if (wrong[m] && now - wrong[m] < 380) return { fill: '#f25f5c', deep: '#c73a37', strong: true };
+    if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], deep: HAND_DEEP[demoKeys[m]], strong: true, hand: demoKeys[m] };   // sounding in Listen
     if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0) {
       var hand = step.hands[m];
       var on = !!(held[m] || st.hits[m]);
-      return { fill: on ? HAND_COLOR[hand] : (isBlack(m) ? HAND_COLOR[hand] : HAND_SOFT[hand]), strong: on, target: true };
+      return {
+        fill: on ? HAND_COLOR[hand] : (isBlack(m) ? HAND_COLOR[hand] : HAND_SOFT[hand]),
+        deep: HAND_DEEP[hand],
+        strong: on,
+        target: true,
+        hand: hand
+      };
     }
-    if (held[m]) return { fill: isBlack(m) ? '#6b7a8d' : '#c3cedb', strong: true };
+    if (held[m]) return { fill: isBlack(m) ? '#5e6c80' : '#cdd6e3', deep: '#465264', strong: true };
     return null;
   }
 
   function drawKeyboard(now, step) {
     var top = geo.kbTop, kh = geo.kbH, ww = geo.ww;
-    ctx.fillStyle = '#0c0e12';
+    ctx.fillStyle = '#090b0f';
     ctx.fillRect(0, top, W, kh);
 
-    // white keys
+    var feltH = 3, keyTop = top + feltH, keyH = kh - feltH - 2;
+
+    // white keys (warm ivory gradient + sculpted bottom bevel)
     for (var i = 0; i < geo.whites.length; i++) {
       var m = geo.whites[i], x = i * ww, s = keyState(m, now, step);
-      ctx.fillStyle = s ? s.fill : '#f4f5f7';
-      rr(x + 1, top + 1, ww - 2, kh - 3, 4);
+      var kx = x + 0.8, kw = Math.max(2, ww - 1.6);
+      var pressed = !!(s && s.strong);
+      var lipH = pressed ? 2 : 4;
+
+      if (s && s.strong) {
+        var pg = ctx.createLinearGradient(0, keyTop, 0, keyTop + keyH);
+        pg.addColorStop(0, s.deep || s.fill);
+        pg.addColorStop(1, s.fill);
+        ctx.fillStyle = pg;
+      } else if (s && s.target) {
+        var tg = ctx.createLinearGradient(0, keyTop, 0, keyTop + keyH);
+        tg.addColorStop(0, '#ffffff');
+        tg.addColorStop(0.35, s.fill);
+        tg.addColorStop(1, s.fill);
+        ctx.fillStyle = tg;
+      } else {
+        var wg = ctx.createLinearGradient(0, keyTop, 0, keyTop + keyH);
+        wg.addColorStop(0, '#efede8');
+        wg.addColorStop(0.06, '#fdfcfa');
+        wg.addColorStop(0.92, '#f2efe9');
+        wg.addColorStop(1, '#e1ddd4');
+        ctx.fillStyle = wg;
+      }
+      rr(kx, keyTop, kw, keyH, 4);
       ctx.fill();
+
+      // sculpted bottom lip / target color bar
+      if (s && s.target && !s.strong) {
+        ctx.fillStyle = HAND_COLOR[s.hand];
+        rr(kx + 1, keyTop + keyH - 5, Math.max(1, kw - 2), 4, 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = pressed ? 'rgba(0,0,0,0.22)' : 'rgba(130,122,108,0.28)';
+        ctx.fillRect(kx + 2, keyTop + keyH - lipH, Math.max(0, kw - 4), lipH);
+      }
+
       // labels
       var showLabel = settings.labels === 'all' || (settings.labels === 'C' && m % 12 === 0);
       if (showLabel && ww >= 14) {
         var txt = localNoteName((m % 12 === 0 || ww >= 26) ? midiToName(m) : midiToName(m).replace(/-?\d+$/, ''));
         if (settings.labels === 'all' && m % 12 !== 0 && ww < 26) txt = txt.charAt(0);
-        ctx.fillStyle = m === 60 ? '#1d6fe0' : '#5b6472';
-        ctx.font = (m === 60 ? '700 ' : '500 ') + Math.min(14, Math.max(9, ww * 0.32)) + 'px system-ui, sans-serif';
+        ctx.fillStyle = (s && s.strong) ? '#ffffff' : (m === 60 ? '#1b65cc' : '#636c7a');
+        ctx.font = (m === 60 ? '700 ' : '500 ') + Math.min(13.5, Math.max(9, ww * 0.31)) + 'px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        ctx.fillText(txt, x + ww / 2, top + kh - 8);
+        ctx.fillText(txt, x + ww / 2, keyTop + keyH - 8);
       }
       if (m === 60) { // middle C marker
-        ctx.fillStyle = '#1d6fe0';
-        ctx.beginPath(); ctx.arc(x + ww / 2, top + geo.bh + 12, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = (s && s.strong) ? 'rgba(255,255,255,0.9)' : '#1b65cc';
+        ctx.beginPath(); ctx.arc(x + ww / 2, keyTop + geo.bh + 11, 2.8, 0, Math.PI * 2); ctx.fill();
       }
     }
 
-    // black keys
+    // black keys (3D ebony with soft cast shadow onto white keys)
     for (var b = geo.lo; b <= geo.hi; b++) {
       if (!isBlack(b)) continue;
       var r = keyRect(b), sb = keyState(b, now, step);
-      ctx.fillStyle = sb ? sb.fill : '#1c1f25';
-      rr(r.x, top, r.w, geo.bh, 3);
+      var bPressed = !!(sb && sb.strong);
+      var bh = geo.bh - feltH;
+
+      // soft drop shadow on white keys
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      rr(r.x + 1.5, keyTop + 2, r.w + 1, bh + 3, 4);
       ctx.fill();
-      if (!sb) { // subtle highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fillRect(r.x + 3, top + 2, r.w - 6, geo.bh * 0.75);
+
+      if (sb) {
+        var bg = ctx.createLinearGradient(0, keyTop, 0, keyTop + bh);
+        bg.addColorStop(0, sb.deep || sb.fill);
+        bg.addColorStop(1, sb.fill);
+        ctx.fillStyle = bg;
+      } else {
+        var eg = ctx.createLinearGradient(0, keyTop, 0, keyTop + bh);
+        eg.addColorStop(0, '#2a2f3a');
+        eg.addColorStop(0.84, '#161920');
+        eg.addColorStop(1, '#0e1015');
+        ctx.fillStyle = eg;
+      }
+      rr(r.x, keyTop, r.w, bh, 3.5);
+      ctx.fill();
+
+      // sculpted inner key top face
+      if (!sb) {
+        var fg = ctx.createLinearGradient(0, keyTop + 2, 0, keyTop + bh - 8);
+        fg.addColorStop(0, 'rgba(255,255,255,0.12)');
+        fg.addColorStop(1, 'rgba(255,255,255,0.03)');
+        ctx.fillStyle = fg;
+        rr(r.x + 2.5, keyTop + 2, Math.max(1, r.w - 5), Math.max(4, bh - 10), 2);
+        ctx.fill();
+      } else if (!bPressed) {
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        rr(r.x + 2.5, keyTop + 2, Math.max(1, r.w - 5), Math.max(4, bh - 10), 2);
+        ctx.fill();
       }
     }
+
+    // classic grand-piano crimson felt strip + subtle top shadow
+    ctx.fillStyle = '#681c27';
+    ctx.fillRect(0, top, W, feltH);
+    var topShade = ctx.createLinearGradient(0, keyTop, 0, keyTop + 8);
+    topShade.addColorStop(0, 'rgba(0,0,0,0.28)');
+    topShade.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = topShade;
+    ctx.fillRect(0, keyTop, W, 8);
 
     // finger numbers on the keys to play now
     if (settings.fingers && step && !anyModalOpen()) {
@@ -775,13 +878,21 @@
         if (!f || fm < geo.lo || fm > geo.hi) return;
         var kr = keyRect(fm), black = isBlack(fm);
         var rad = Math.max(7, black ? Math.min(kr.w * 0.42, 12) : Math.min(ww * 0.34, 14));   // readable even with 88 small keys
-        var cy = black ? top + geo.bh - rad - 6 : top + kh - rad - 28;
-        ctx.fillStyle = '#14171c';
+        var cy = black ? keyTop + (geo.bh - feltH) - rad - 7 : keyTop + keyH - rad - 28;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 1.5;
+        ctx.fillStyle = '#14171f';
         ctx.beginPath(); ctx.arc(kr.x + kr.w / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.lineWidth = 1.25;
+        ctx.beginPath(); ctx.arc(kr.x + kr.w / 2, cy, rad - 0.6, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.font = '800 ' + Math.round(rad * 1.3) + 'px system-ui, sans-serif';
+        ctx.font = '800 ' + Math.round(rad * 1.28) + 'px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(f), kr.x + kr.w / 2, cy + 1);
+        ctx.fillText(String(f), kr.x + kr.w / 2, cy + 0.5);
       });
     }
   }
