@@ -59,6 +59,9 @@ and **restore** it later or on another device.
   (or point at it with a mouse). A card explains it: its name, how many beats it lasts, where the
   note sits on the staff, ♯/♭/♮, ties, finger numbers. The note's keys light up on the keyboard,
   and *Play* lets you hear it. *Settings → What the symbols mean* lists them all with pictures.
+- **Reading mode** (👁 Read, with the sheet music): the screen keyboard no longer shows which key to play,
+  so you read the notes from the sheet music instead. After a wrong key the right one lights up; tapping a
+  note in the score shows its keys too.
 - **Falling notes** (tap ♫ Sheet to switch): notes fall onto the keys; the app waits for the right keys.
   Imported MIDI files are always shown this way.
 - **Note names** are shown on all white keys; in Settings you can reduce them to the C keys or turn them off.

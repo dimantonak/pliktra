@@ -78,7 +78,7 @@
   }
 
   var savedSettings = store.get('pliktra.settings', {});
-  var settings = Object.assign({ labels: 'all', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'sheet',
+  var settings = Object.assign({ labels: 'all', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'sheet', reading: false,
     listenSpeed: '1', listenOnPiano: true, lang: 'auto' }, savedSettings);
   if ((savedSettings.v || 1) < 2) {   // v2: sheet music and note names on all keys became the defaults
     settings.view = 'sheet';
@@ -175,7 +175,7 @@
     st.idx = Math.max(0, Math.min(from || 0, Math.max(0, st.steps.length - 1)));
     if (loopOn() && (st.idx < loop.a || st.idx > loop.b)) clearLoop();   // moved outside the loop
     st.startIdx = st.idx;
-    st.hits = {}; st.stepMistake = false;
+    st.hits = {}; st.stepMistake = false; st.rescue = false;
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
     st.viewT = targetT();
     updateStats(); updateHint();
@@ -195,6 +195,7 @@
       // One-hand practice: playing the other hand's part along with it is not a mistake.
     } else {
       wrong[m] = performance.now();
+      if (readingOn()) st.rescue = true;   // reading mode: now show the key to play
       if (st.startTime) { st.mistakes++; st.stepMistake = true; updateStats(); }
     }
   }
@@ -213,7 +214,7 @@
   function advance() {
     if (!st.stepMistake) st.clean++;
     st.idx++;
-    st.hits = {}; st.stepMistake = false;
+    st.hits = {}; st.stepMistake = false; st.rescue = false;
     if (loopOn() && st.idx > loop.b) {   // end of the loop: count the round and go again
       loop.laps++; loop.lastMistakes = st.mistakes;
       restart(loop.a);
@@ -242,6 +243,10 @@
 
   // Sheet music exists only for typed songs; MIDI files are always shown as falling notes.
   function sheetOn() { return settings.view === 'sheet' && !(st.song && st.song.kind !== 'text'); }
+  // Reading mode: find the notes on the sheet music yourself. The screen keyboard shows the key to play
+  // (and its finger) only after a wrong key, or when a note in the score is tapped (explanation card).
+  function readingOn() { return !!settings.reading && sheetOn(); }
+  function keyHintsOn() { return !readingOn() || !!st.rescue; }
 
   function refreshSheet() {
     var box = $('#sheet'), inner = $('#sheetInner'), msgEl = $('#sheetMsg');
@@ -472,7 +477,7 @@
       var res = !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
       h = t('hintRound', { n: loop.laps, result: res });
     }
-    else if (!st.startTime && !st.finished) h = t('hintStart');
+    else if (!st.startTime && !st.finished) h = t(readingOn() ? 'hintRead' : 'hintStart');
     $('#hint').textContent = h;
   }
 
@@ -917,7 +922,7 @@
     if (wrong[m] && now - wrong[m] < 380) return { fill: '#f25f5c', deep: '#c73a37', strong: true };
     if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], deep: HAND_DEEP[demoKeys[m]], strong: true, hand: demoKeys[m] };   // sounding in Listen
     if (explainKeys[m]) return { fill: HAND_COLOR[explainKeys[m]], deep: HAND_DEEP[explainKeys[m]], strong: true, hand: explainKeys[m] };   // tapped in the score
-    if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0) {
+    if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0 && (keyHintsOn() || st.hits[m])) {
       var hand = step.hands[m];
       var on = !!(held[m] || st.hits[m]);
       return {
@@ -1046,7 +1051,7 @@
     ctx.fillRect(0, keyTop, W, 8);
 
     // finger numbers on the keys to play now
-    if (settings.fingers && step && !anyModalOpen()) {
+    if (settings.fingers && step && !anyModalOpen() && keyHintsOn()) {
       step.notes.forEach(function (fm) {
         var f = step.fingers && step.fingers[fm];
         if (!f || fm < geo.lo || fm > geo.hi) return;
@@ -1730,14 +1735,32 @@
     b.title = t(midi ? 'sheetMidi' : 'sheetTitle');
     b.classList.toggle('on', sheetOn());
     b.setAttribute('aria-pressed', sheetOn() ? 'true' : 'false');
+    showReadToggle();   // reading mode needs the sheet music
   }
   $('#btnView').onclick = function () {
     settings.view = settings.view === 'sheet' ? 'lane' : 'sheet';
     store.set('pliktra.settings', settings);
     showViewToggle();
     refreshSheet();
+    updateHint();
   };
   showViewToggle();
+  function showReadToggle() {
+    var b = $('#btnRead'), on = readingOn();
+    b.disabled = !sheetOn();
+    b.title = t(sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  $('#btnRead').onclick = function () {
+    settings.reading = !settings.reading;
+    store.set('pliktra.settings', settings);
+    st.rescue = false;
+    showReadToggle();
+    updateHint();
+    dirty = true;
+  };
+  showReadToggle();
   $('#btnAgain').onclick = function () { closeModal('mResult'); restart(st.startIdx); };   // same section again
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
