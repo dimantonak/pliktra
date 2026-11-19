@@ -25,6 +25,7 @@ const EXTRA = [
   ['very short notes', 'C4_0.1 D4_0.1 E4_3.8'],
   ['2/4 with a whole-bar rest', '2/4 C4 | -_2'],
   ['6/8', '6/8 C4_0.5 D4_0.5 E4_0.5 F4_1.5 | G4_3'],
+  ['key signature', 'key:Bb 3/4 Bb3+D4 F4 Eb4 | E4_3'],
   ['dotted notes and rests, both hands', 'C3+E4_1.5 D4_0.5 C3+E4 F4 | G3+G4_0.75 F4_0.25 E3+E4_3 | C4_0.5 -_1.5 D4_2']
 ];
 

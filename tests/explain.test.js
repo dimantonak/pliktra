@@ -59,6 +59,10 @@ for (const lang of Object.keys(L.LANGS)) {
     complete(Explain.card({ type: 'note', dur: '8', len: 0.5, hand: 'R', first: true, beam: true, notes: [{ m: 70, s: 'Bb4' }], acc: {} }, [6, 8]));
     for (const info of [{ type: 'clef', clef: 'treble' }, { type: 'clef', clef: 'bass' }, { type: 'time' }, { type: 'bar' },
       { type: 'bar', final: true }, { type: 'brace' }]) complete(Explain.card(info, [3, 4]));
+    for (const key of ['G', 'F', 'D', 'Bb', 'Em', 'F#m', 'C#', 'Cb']) complete(Explain.card({ type: 'key' }, [4, 4], key));
+    complete(Explain.card({ type: 'time' }, [3, 16]));
+    complete(Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 66 }, { m: 70, s: 'Bb4' }], acc: {} }, [4, 4], 'G'));
+    complete(Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 65 }], acc: {} }, [4, 4], 'G'));
     for (const g of Explain.glossary()) complete({ title: g.title, lines: [g.text] });
     L.setLang('en');
   });
@@ -86,7 +90,28 @@ test('what a card says', () => {
   const carried = Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 66, s: 'F#4' }], acc: {} }, [4, 4]);
   assert.ok(carried.lines.some(l => l.startsWith('No ♯ or ♭')));
 
+  // key signatures
+  const g = Explain.card({ type: 'key' }, [4, 4], 'G');
+  assert.equal(g.title, 'Key signature: G major');
+  assert.ok(g.lines.includes('1 ♯ right after the clef: play F as F♯.'), g.lines.join(' | '));
+  assert.ok(g.tips.includes('1 ♯: the key signature of G major and E minor.'));
+  assert.ok(g.noPlay);
+  assert.equal(g.keys[66], 'R');
+  assert.equal(g.keys[54], 'L');
+  assert.equal(Object.keys(g.keys).length, 7);   // every F♯ on the keyboard
+  assert.ok(Explain.card({ type: 'key' }, [4, 4], 'Bb').lines.includes('2 ♭ right after the clef: play B as B♭ and E as E♭.'));
+  const fs = Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 66 }], acc: {} }, [4, 4], 'G');
+  assert.ok(fs.lines.includes('♯ from the key signature: every F is played as F♯.'), fs.lines.join(' | '));
+  assert.ok(!fs.lines.some(l => l.startsWith('No ♯ or ♭')));
+  const fn = Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 65 }], acc: { 0: 'n' } }, [4, 4], 'G');
+  assert.ok(fn.lines.some(l => l.startsWith('♮ Natural')));
+  const fnLater = Explain.card({ type: 'note', dur: 'q', len: 1, hand: 'R', first: true, notes: [{ m: 65 }], acc: {} }, [4, 4], 'G');
+  assert.ok(fnLater.lines.some(l => l.startsWith('No sign in front of it')));
+  assert.ok(Explain.card({ type: 'time' }, [3, 16]).lines.includes('Bottom number 16: a sixteenth note is one beat.'));
+
   L.setLang('de');
+  assert.equal(Explain.card({ type: 'key' }, [4, 4], 'F#m').title, 'Vorzeichen: fis-Moll');
+  assert.ok(Explain.card({ type: 'key' }, [4, 4], 'F').lines.includes('1 ♭ direkt nach dem Schlüssel: spiele H als B.'));
   const de = Explain.card({ type: 'note', dur: 'h', len: 2, hand: 'L', first: true, notes: [{ m: 59, s: 'B3', f: 1 }], acc: {} }, [4, 4]);
   assert.equal(de.title, 'Halbe Note');
   assert.ok(de.lines.includes('H3: direkt über den Notenlinien, Finger 1'), de.lines.join(' | '));   // B3 in the bass staff

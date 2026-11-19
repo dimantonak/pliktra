@@ -36,6 +36,30 @@ test('fingers and time signature', () => {
   assert.equal(N.parseSongText('C4 3/4').errors.length, 1);   // only at the start
 });
 
+test('key signature: only changes how the music is written', () => {
+  const r = N.parseSongText('key:G 3/4 F4 F#4 Bb3');
+  assert.equal(r.key, 'G');
+  assert.deepEqual(r.meter, [3, 4]);
+  assert.deepEqual(r.notes.map(n => n.m), [65, 66, 58]);   // F4 stays the white key
+  assert.deepEqual(N.offKeyNotes(r.notes, r.key), ['F4', 'Bb3']);
+  assert.equal(N.parseSongText('C4').key, 'C');
+  const keys = { G: 'G', bb: 'Bb', 'f#m': 'F#m', '2#': 'D', '3b': 'Eb', '1♭': 'F', 0: 'C', '8#': null, H: null, 'Cb': 'Cb', em: 'Em' };
+  for (const [s, k] of Object.entries(keys)) assert.equal(N.parseKey(s), k, s);
+  assert.deepEqual(N.keyAccidentals('Bb'), { B: -1, E: -1 });
+  assert.deepEqual(N.keyAccidentals('A'), { F: 1, C: 1, G: 1 });
+  assert.deepEqual(N.keyPair('G'), ['G', 'Em']);
+  assert.deepEqual(N.keyPair('Dm'), ['F', 'Dm']);
+  assert.equal(N.parseSongText('C4 key:G').errors.length, 1);   // only at the start
+  assert.equal(N.parseSongText('key:X C4').errors.length, 1);
+  // recording: flat keys write black keys as flats
+  assert.equal(N.nameInKey(70, 'F'), 'Bb4');
+  assert.equal(N.nameInKey(66, 'G'), 'F#4');
+  assert.equal(N.nameInKey(65, 'G'), 'F4');
+  for (let m = 21; m <= 108; m++) assert.equal(N.parseNoteName(N.nameInKey(m, 'Eb')), m);
+  assert.equal(N.spelled('E#4'), 'E#4');   // keys with many sharps
+  assert.equal(N.spelled('F#4'), null);
+});
+
 test('lengths must be numbers', () => {
   assert.equal(N.parseSongText('C4_2abc').errors.length, 1);
   assert.equal(N.parseSongText('C4_2_3').errors.length, 1);

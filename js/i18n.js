@@ -83,8 +83,10 @@ var I18N = {
     ledgerInfo: 'Ledger lines are short extra lines for notes too high or too low for the five lines.',
     accSharp: '♯ Sharp: play the next key to the right (a half step higher). It counts until the end of the bar.',
     accFlat: '♭ Flat: play the next key to the left (a half step lower). It counts until the end of the bar.',
-    accNatural: '♮ Natural: cancels a ♯ or ♭ from earlier in the bar. Play the white key.',
+    accNatural: '♮ Natural: cancels a ♯ or ♭ (from the key signature or earlier in the bar) until the end of the bar. Play the white key.',
     accCarry: 'No ♯ or ♭ in front of it: the one from earlier in this bar still counts.',
+    accCarryNat: 'No sign in front of it: the ♮ from earlier in this bar still counts.',
+    accKey: '{sig} from the key signature: every {l} is played as {name}.',
     tieStart: 'A tie (curved line) joins it to the next note of the same pitch: play once and hold for both lengths together.',
     tieEnd: 'The tie (curved line) joins it to the note before: keep holding the key, don’t play it again.',
     beamInfo: 'Short notes are joined by a beam (the thick line) instead of separate flags, so the beats are easy to see.',
@@ -101,8 +103,22 @@ var I18N = {
     timeBottom4: 'Bottom number 4: a quarter note is one beat.',
     timeBottom8: 'Bottom number 8: an eighth note is one beat.',
     timeBottom2: 'Bottom number 2: a half note is one beat.',
+    timeBottom16: 'Bottom number 16: a sixteenth note is one beat.',
     timeCount: 'Count: {c}',
     timeGloss: 'Top number: beats in every bar. Bottom number: which note is one beat (4 = quarter note).',
+    keyT: 'Key signature: {k}',
+    keySigT: 'Key signature',
+    keyMajor: '{k} major',
+    keyMinor: '{k} minor',
+    keyLine: '{n} {sig} right after the clef: play {list}.',
+    keyAs: '{a} as {b}',
+    keyAll: 'This counts in every octave until the end of the piece, so the {sig} isn’t written in front of these notes again.',
+    keyCancel: 'A ♮ in front of a note cancels it until the end of the bar.',
+    keyPairInfo: '{n} {sig}: the key signature of {maj} and {min}.',
+    keyOrderSharp: 'The ♯ always come in this order: F♯ C♯ G♯ D♯ A♯ E♯ B♯.',
+    keyOrderFlat: 'The ♭ always come in this order: B♭ E♭ A♭ D♭ G♭ C♭ F♭.',
+    keyGloss: '♯ or ♭ right after the clef count for the whole piece, in every octave. Here: every F is played as F♯ (G major).',
+    keyCheck: 'Not as in the key signature ({k}): {list}. The sheet music shows a ♯, ♭ or ♮ in front of them – check them against your book.',
     barT: 'Bar line',
     barInfo: 'Divides the music into bars of {n} beats each.',
     barGloss: 'Divides the music into bars. Each bar has as many beats as the time signature says.',
@@ -148,11 +164,13 @@ var I18N = {
       '<li>Fingers: add <code>/</code> and the finger after a note: <code>E4/3</code>, <code>G3/4+B3/2</code>. 1 = thumb, 2 = index, 3 = middle, 4 = ring, 5 = little finger (same numbers for both hands).</li>' +
       '<li>Length in beats: <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat (1 beat = a quarter note). <code>-</code> is a rest, <code>-_2</code> a 2-beat rest.</li>' +
       '<li>Time signature: write it first, e.g. <code>3/4</code> or <code>6/8</code> (default 4/4). It sets the bars in the sheet music.</li>' +
+      '<li>Key signature: also at the start, e.g. <code>key:G</code> (1 ♯), <code>key:F</code> (1 ♭), or by number: <code>key:2#</code>, <code>key:3b</code>. The sheet music then shows the ♯/♭ once after the clef, like your book. Still write every note as it is played: in G major, every F is <code>F#</code>.</li>' +
       '<li>Bar lines <code>|</code> and anything after <code>//</code> are ignored.</li>' +
       '<li><b>Record from piano</b> adds what you play on the piano to the end of the text.</li>',
     // parser errors
     errLength: '"{tok}": the length after _ must be a number', errMeterPos: '"{tok}": a time signature can only be at the start',
-    errMeter: '"{tok}" is not a time signature', errFinger: '"{tok}": the finger after / must be 1 to 5', errNote: '"{tok}" is not a note on the piano',
+    errMeter: '"{tok}" is not a time signature', errKeyPos: '"{tok}": a key signature can only be at the start',
+    errKey: '"{tok}" is not a key signature (e.g. key:G, key:F, key:2#)', errFinger: '"{tok}": the finger after / must be 1 to 5', errNote: '"{tok}" is not a note on the piano',
     // MIDI import
     importTitle: 'Import MIDI file', importHelp: 'Choose which hand plays each part of the file.',
     part: 'Part', range: 'Range', hand: 'Hand', rightHand: 'Right hand', leftHand: 'Left hand', split: 'Split at middle C', skip: 'Skip',
@@ -254,8 +272,10 @@ var I18N = {
     ledgerInfo: 'Hilfslinien sind kurze Extralinien für Töne, die zu hoch oder zu tief für die fünf Notenlinien sind.',
     accSharp: '♯ Kreuz: die nächste Taste rechts spielen (einen Halbton höher). Gilt bis zum Ende des Takts.',
     accFlat: '♭ Be: die nächste Taste links spielen (einen Halbton tiefer). Gilt bis zum Ende des Takts.',
-    accNatural: '♮ Auflösungszeichen: hebt ein ♯ oder ♭ von vorher im Takt auf. Die weiße Taste spielen.',
+    accNatural: '♮ Auflösungszeichen: hebt ein ♯ oder ♭ (aus den Vorzeichen oder von vorher im Takt) bis zum Ende des Takts auf. Die weiße Taste spielen.',
     accCarry: 'Kein ♯ oder ♭ davor: das Zeichen von vorher in diesem Takt gilt noch.',
+    accCarryNat: 'Kein Zeichen davor: das ♮ von vorher in diesem Takt gilt noch.',
+    accKey: '{sig} aus den Vorzeichen: jedes {l} wird als {name} gespielt.',
     tieStart: 'Ein Haltebogen verbindet sie mit der nächsten gleichen Note: einmal anschlagen und beide Längen zusammen halten.',
     tieEnd: 'Der Haltebogen verbindet sie mit der Note davor: Taste weiter halten, nicht neu anschlagen.',
     beamInfo: 'Kurze Noten werden mit einem Balken (dicker Strich) statt einzelner Fähnchen verbunden, so sieht man die Schläge besser.',
@@ -272,8 +292,22 @@ var I18N = {
     timeBottom4: 'Untere Zahl 4: eine Viertelnote ist ein Schlag.',
     timeBottom8: 'Untere Zahl 8: eine Achtelnote ist ein Schlag.',
     timeBottom2: 'Untere Zahl 2: eine halbe Note ist ein Schlag.',
+    timeBottom16: 'Untere Zahl 16: eine Sechzehntelnote ist ein Schlag.',
     timeCount: 'Zählen: {c}',
     timeGloss: 'Obere Zahl: Schläge pro Takt. Untere Zahl: welche Note ein Schlag ist (4 = Viertelnote).',
+    keyT: 'Vorzeichen: {k}',
+    keySigT: 'Vorzeichen (Tonart)',
+    keyMajor: '{k}-Dur',
+    keyMinor: '{k}-Moll',
+    keyLine: '{n} {sig} direkt nach dem Schlüssel: spiele {list}.',
+    keyAs: '{a} als {b}',
+    keyAll: 'Das gilt in jeder Oktave bis zum Ende des Stücks, deshalb steht das {sig} nicht noch einmal vor diesen Noten.',
+    keyCancel: 'Ein ♮ vor einer Note hebt es bis zum Ende des Takts auf.',
+    keyPairInfo: '{n} {sig}: die Vorzeichen von {maj} und {min}.',
+    keyOrderSharp: 'Die ♯ kommen immer in dieser Reihenfolge: Fis Cis Gis Dis Ais Eis His.',
+    keyOrderFlat: 'Die ♭ kommen immer in dieser Reihenfolge: B Es As Des Ges Ces Fes.',
+    keyGloss: '♯ oder ♭ direkt nach dem Schlüssel gelten für das ganze Stück, in jeder Oktave. Hier: jedes F wird als Fis gespielt (G-Dur).',
+    keyCheck: 'Anders als die Vorzeichen ({k}): {list}. Die Noten zeigen davor ein ♯, ♭ oder ♮ – vergleiche sie mit deinem Buch.',
     barT: 'Taktstrich',
     barInfo: 'Teilt die Musik in Takte mit je {n} Schlägen.',
     barGloss: 'Teilt die Musik in Takte. Jeder Takt hat so viele Schläge, wie die Taktart sagt.',
@@ -318,10 +352,12 @@ var I18N = {
       '<li>Finger: <code>/</code> und den Finger nach der Note: <code>E4/3</code>, <code>G3/4+B3/2</code>. 1 = Daumen, 2 = Zeigefinger, 3 = Mittelfinger, 4 = Ringfinger, 5 = kleiner Finger (gleiche Zahlen für beide Hände).</li>' +
       '<li>Länge in Schlägen: <code>C4_2</code> = 2 Schläge, <code>G4_0.5</code> = ein halber Schlag (1 Schlag = eine Viertelnote). <code>-</code> ist eine Pause, <code>-_2</code> eine Pause von 2 Schlägen.</li>' +
       '<li>Taktart: zuerst schreiben, z. B. <code>3/4</code> oder <code>6/8</code> (sonst 4/4). Sie bestimmt die Takte in den Noten.</li>' +
+      '<li>Vorzeichen: auch am Anfang, z. B. <code>key:G</code> (1 ♯, G-Dur), <code>key:F</code> (1 ♭, F-Dur), <code>key:Bb</code> (B-Dur) oder nach Anzahl: <code>key:2#</code>, <code>key:3b</code>. Die Noten zeigen die ♯/♭ dann einmal nach dem Schlüssel, wie im Buch. Trotzdem jede Note so schreiben, wie sie gespielt wird: in G-Dur ist jedes F ein <code>F#</code> (Fis).</li>' +
       '<li>Taktstriche <code>|</code> und alles nach <code>//</code> werden ignoriert.</li>' +
       '<li><b>Vom Klavier aufnehmen</b> fügt das, was du auf dem Klavier spielst, am Ende des Textes an.</li>',
     errLength: '„{tok}“: nach _ muss eine Zahl stehen', errMeterPos: '„{tok}“: eine Taktart darf nur am Anfang stehen',
-    errMeter: '„{tok}“ ist keine Taktart', errFinger: '„{tok}“: der Finger nach / muss 1 bis 5 sein', errNote: '„{tok}“ ist keine Note auf dem Klavier',
+    errMeter: '„{tok}“ ist keine Taktart', errKeyPos: '„{tok}“: Vorzeichen dürfen nur am Anfang stehen',
+    errKey: '„{tok}“ ist keine Tonart (z. B. key:G, key:F, key:2#)', errFinger: '„{tok}“: der Finger nach / muss 1 bis 5 sein', errNote: '„{tok}“ ist keine Note auf dem Klavier',
     importTitle: 'MIDI-Datei importieren', importHelp: 'Wähle, welche Hand jede Spur der Datei spielt.',
     part: 'Spur', range: 'Umfang', hand: 'Hand', rightHand: 'Rechte Hand', leftHand: 'Linke Hand', split: 'Am mittleren C teilen', skip: 'Weglassen',
     importedSong: 'Importiertes Stück', midiReadFail: 'Diese MIDI-Datei konnte nicht gelesen werden.', midiNoNotes: 'In dieser Datei wurden keine Klaviernoten gefunden.',
@@ -390,6 +426,16 @@ function localNoteName(name) {
   return base + r[3];
 }
 
+// Key names for display: "G" -> "G major" / "G-Dur", "F#m" -> "F♯ minor" / "fis-Moll", "Bb" -> "B♭ major" / "B-Dur".
+function localKeyName(key) {
+  var r = /^([A-G])([#b]?)(m?)$/.exec(key);
+  if (!r) return key;
+  var root = localNoteName(r[1] + r[2]);
+  if (root === r[1] + r[2]) root = r[1] + (r[2] === '#' ? '♯' : r[2] === 'b' ? '♭' : '');
+  if (r[3] && LANG === 'de') root = root.toLowerCase();   // German writes minor keys in lower case: e-Moll
+  return t(r[3] ? 'keyMinor' : 'keyMajor', { k: root });
+}
+
 // Fills the page's fixed texts: data-i18n (text), data-i18n-html, -title, -aria (aria-label), -ph (placeholder).
 function applyI18n(root) {
   root = root || document;
@@ -402,6 +448,6 @@ function applyI18n(root) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { I18N: I18N, LANGS: LANGS, t: t, localNoteName: localNoteName, pickLang: pickLang,
+  module.exports = { I18N: I18N, LANGS: LANGS, t: t, localNoteName: localNoteName, localKeyName: localKeyName, pickLang: pickLang,
     setLang: function (l) { LANG = l; } };
 }

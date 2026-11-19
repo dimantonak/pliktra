@@ -138,6 +138,7 @@
 
   function restart(from) {
     endDemo();
+    closeExplain();
     st.idx = Math.max(0, Math.min(from || 0, Math.max(0, st.steps.length - 1)));
     if (loopOn() && (st.idx < loop.a || st.idx > loop.b)) clearLoop();   // moved outside the loop
     st.startIdx = st.idx;
@@ -324,14 +325,14 @@
   }
 
   function showExplain(found, pinned) {
-    var d = sheetState.data, c = Explain.card(found.hit.info, d.meter);
+    var d = sheetState.data, c = Explain.card(found.hit.info, d.meter, d.key);
     var box = $('#explain');
     $('#exTitle').textContent = c.title;
     var ul = $('#exLines');
     ul.innerHTML = '';
     c.lines.forEach(function (l) { ul.appendChild(el('li', '', l)); });
     c.tips.forEach(function (l) { ul.appendChild(el('li', 'tip', l)); });
-    $('#exPlay').hidden = !Object.keys(c.keys).length;
+    $('#exPlay').hidden = c.noPlay || !Object.keys(c.keys).length;
     explain = { hit: found.hit, idx: st.idx, pinned: pinned, keys: c.keys };
     explainKeys = c.keys;
     dirty = true;
@@ -382,8 +383,13 @@
       else closeExplain();
     }, 250);
   });
-  $('#sheetInner').addEventListener('pointerleave', function () {
+  $('#sheetInner').addEventListener('pointerleave', function (e) {
     clearTimeout(hoverTimer);
+    if ($('#explain').contains(e.relatedTarget)) return;   // onto the card, e.g. to press Play
+    if (explain && !explain.pinned) closeExplain();
+  });
+  $('#explain').addEventListener('pointerleave', function (e) {
+    if (e.pointerType !== 'mouse' || $('#sheetInner').contains(e.relatedTarget)) return;
     if (explain && !explain.pinned) closeExplain();
   });
   $('#explain').addEventListener('click', function (e) { e.stopPropagation(); });
@@ -1115,7 +1121,7 @@
   });
 
   // ---------------------------------------------------------------- modals
-  function openModal(id) { stopDemo(); $('#' + id).classList.add('open'); dirty = true; }
+  function openModal(id) { stopDemo(); closeExplain(); $('#' + id).classList.add('open'); dirty = true; }
   function closeModal(id) {
     $('#' + id).classList.remove('open');
     if (id === 'mEditor') setRecording(false);
@@ -1500,6 +1506,9 @@
     var r = parseSongText($('#edText').value);
     $('#edInfo').textContent = r.steps ? t('edInfo', { n: r.steps, hands: handsLabel(r.notes) }) : '';
     $('#edError').textContent = r.errors.slice(0, 5).join('\n') + (r.errors.length > 5 ? '\n' + t('moreErrors', { n: r.errors.length - 5 }) : '');
+    var off = offKeyNotes(r.notes, r.key);
+    $('#edKeyCheck').textContent = off.length ? t('keyCheck', { k: localKeyName(r.key),
+      list: off.slice(0, 6).map(localNoteName).join(', ') + (off.length > 6 ? ' …' : '') }) : '';
     return r;
   }
 
@@ -1511,7 +1520,7 @@
   }
 
   function recordNote(m) {
-    var ta = $('#edText'), now = performance.now(), name = midiToName(m);
+    var ta = $('#edText'), now = performance.now(), name = nameInKey(m, parseSongText(ta.value).key);
     var v = ta.value;
     if (/\/\/[^\n]*$/.test(v)) v += '\n';   // last line is a // comment: start a new line
     var endsWithSpace = !v || /\s$/.test(v);

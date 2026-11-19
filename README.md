@@ -26,6 +26,10 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
 - **Typed songs**: `C4 D4 E4`, chords `C4+E4+G4`, force a hand with `L:` / `R:`,
   fingers `E4/3`, lengths `C4_2`, rests `-`, time signature `3/4` at the start.
   Full help is in the song editor.
+- **Key signatures**: write e.g. `key:G` (or `key:F`, `key:2#`, `key:3b`) at the start, and the sheet
+  music shows the ♯/♭ once after the clef, like a printed book. Notes are still written as they are played
+  (in G major every F is `F#`); the editor points out notes that don't match the key signature,
+  which is often a forgotten ♯ or ♭.
 - **Record from piano**: in the editor, press *Record from piano* and play; notes are typed for you.
 - **MIDI files** (`.mid`): import from the Songs screen and choose which hand plays each part.
 - **Song list**: tap a song to practise it; the songs you played most recently are at the top.
@@ -46,7 +50,7 @@ and **restore** it later or on another device.
   (blue = right hand, orange = left hand), played notes fade, and the score scrolls along.
   Each hand's rhythm comes from the song text: a note lasts until that hand's next note,
   a rest or the bar line. Available for typed songs.
-- **Learn the symbols**: in the sheet music, tap any note, rest, clef, time signature or bar line
+- **Learn the symbols**: in the sheet music, tap any note, rest, clef, key or time signature or bar line
   (or point at it with a mouse). A card explains it: its name, how many beats it lasts, where the
   note sits on the staff, ♯/♭/♮, ties, finger numbers. The note's keys light up on the keyboard,
   and *Play* lets you hear it. *Settings → What the symbols mean* lists them all with pictures.

@@ -83,7 +83,7 @@ var Sheet = (function () {
         else if (cursor < barEnd - EPS) pushRests(items, cursor, barEnd - cursor);
       });
     });
-    return { bars: bars, meter: p.meter };
+    return { bars: bars, meter: p.meter, key: p.key || 'C' };
   }
 
   function vfKey(n) {
@@ -141,7 +141,7 @@ var Sheet = (function () {
     var YT = 45, YB = 160, H = 290, s = opts.scale || 1;   // treble / bass stave tops, total height
     var widths = lay.bars.map(function (bar, i) {
       var n = Math.max(bar.R.length, bar.L.length);
-      return Math.max(150, 50 + 40 * n) + (i === 0 ? 75 : 0);
+      return Math.max(150, 50 + 40 * n) + (i === 0 ? 75 + 11 * Math.abs(keyCount(lay.key)) : 0);   // clef, key and time signature
     });
     var total = widths.reduce(function (a, b) { return a + b; }, 0) + 30;
 
@@ -160,8 +160,9 @@ var Sheet = (function () {
       var sT = new VF.Stave(x, YT, w), sB = new VF.Stave(x, YB, w);
       if (i === 0) {
         var ts = lay.meter[0] + '/' + lay.meter[1];
-        sT.addClef('treble').addTimeSignature(ts);
-        sB.addClef('bass').addTimeSignature(ts);
+        sT.addClef('treble'); sB.addClef('bass');
+        if (lay.key !== 'C') { sT.addKeySignature(lay.key); sB.addKeySignature(lay.key); }
+        sT.addTimeSignature(ts); sB.addTimeSignature(ts);
       }
       if (i === last) { sT.setEndBarType(VF.Barline.type.END); sB.setEndBarType(VF.Barline.type.END); }
       var startX = Math.max(sT.getNoteStartX(), sB.getNoteStartX());
@@ -170,13 +171,14 @@ var Sheet = (function () {
       if (i === 0) {
         new VF.StaveConnector(sT, sB).setType('brace').setContext(ctx).draw();
         new VF.StaveConnector(sT, sB).setType('singleLeft').setContext(ctx).draw();
-        // what can be tapped for an explanation (js/explain.js): clefs, time signatures, the brace
+        // what can be tapped for an explanation (js/explain.js): clefs, key and time signatures, the brace
         [[sT, 'treble'], [sB, 'bass']].forEach(function (c) {
           var top = c[0].getYForLine(0), bot = c[0].getYForLine(4);
           c[0].getModifiers().forEach(function (m) {
             var cat = m.getCategory();
             if (cat === 'Clef') hits.push({ x: m.getX(), y: top - 20, w: m.getWidth(), h: bot - top + 40, info: { type: 'clef', clef: c[1] } });
             if (cat === 'TimeSignature') hits.push({ x: m.getX(), y: top, w: m.getWidth(), h: bot - top, info: { type: 'time' } });
+            if (cat === 'KeySignature') hits.push({ x: m.getX(), y: top - 10, w: m.getWidth(), h: bot - top + 20, info: { type: 'key', clef: c[1] } });
           });
         });
         hits.push({ x: x - 15, y: sT.getYForLine(0), w: 14, h: sB.getYForLine(4) - sT.getYForLine(0), info: { type: 'brace' } });
@@ -191,7 +193,7 @@ var Sheet = (function () {
         notes.forEach(function (n) { n.setStave(cfg[2]); });
         var voice = new VF.Voice({ num_beats: lay.meter[0], beat_value: lay.meter[1] }).setMode(VF.Voice.Mode.SOFT);
         voice.addTickables(notes);
-        VF.Accidental.applyAccidentals([voice], 'C');
+        VF.Accidental.applyAccidentals([voice], lay.key);   // ♯/♭/♮ only where the key signature doesn't already say it
         extras = extras.concat(VF.Beam.generateBeams(notes, beamOpts));
         items.forEach(function (it, k) {
           if (it.tieNext && notes[k + 1]) {
@@ -237,7 +239,7 @@ var Sheet = (function () {
     pending.forEach(function (p) {
       (marks[p.key] = marks[p.key] || []).push({ hand: p.hand, x: p.note.getAbsoluteX() * s, el: p.note.getSVGElement() });
     });
-    return { width: total * s, height: (bot - top) * s, marks: marks, hits: hits, meter: lay.meter };
+    return { width: total * s, height: (bot - top) * s, marks: marks, hits: hits, meter: lay.meter, key: lay.key };
   }
 
   // A drawn note or rest -> { x, y, w, h, info } for explanations (finger numbers count as part of it).
@@ -270,7 +272,7 @@ var Sheet = (function () {
   }
 
   // A small drawing of one symbol for the "What the symbols mean" list.
-  // spec: { clef, time, notes: [{ keys, dur, dot, rest, acc }], beam, tie, bar, end }
+  // spec: { clef, key, time, notes: [{ keys, dur, dot, rest, acc }], beam, tie, bar, end }
   function mini(container, spec) {
     var VF = Vex.Flow, s = 0.62, W = 96, H = 118;
     container.innerHTML = '';
@@ -282,6 +284,7 @@ var Sheet = (function () {
     stave.setBegBarType(VF.Barline.type.NONE);
     stave.setEndBarType(spec.end ? VF.Barline.type.END : VF.Barline.type.NONE);
     if (spec.clef) stave.addClef(spec.clef);
+    if (spec.key) stave.addKeySignature(spec.key);
     if (spec.time) stave.addTimeSignature(spec.time);
     stave.setContext(ctx).draw();
     if (!spec.notes) return;
