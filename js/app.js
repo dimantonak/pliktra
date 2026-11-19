@@ -91,6 +91,7 @@
 
   // Song title in the user's language (built-in songs are stored with English titles).
   function songName(s) {
+    if (s && s.drill) return t('drillTitle', { name: t(Drills.level(s.drill).name) });
     var tr = s && s.kind === 'text' && BUILTIN_TITLES[LANG];
     return (tr && tr[s.title]) || (s ? s.title : '');
   }
@@ -155,8 +156,10 @@
 
   function loadSong(song) {
     st.song = song;
-    store.set('pliktra.lastSong', song ? song.id : null);
-    if (song) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
+    if (!(song && song.drill)) {   // note reading rounds are made fresh each time: not remembered
+      store.set('pliktra.lastSong', song ? song.id : null);
+      if (song) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
+    }
     $('#songTitle').textContent = song ? songName(song) : t('noSong');
     showViewToggle();
     rebuildSteps();
@@ -175,7 +178,7 @@
     st.idx = Math.max(0, Math.min(from || 0, Math.max(0, st.steps.length - 1)));
     if (loopOn() && (st.idx < loop.a || st.idx > loop.b)) clearLoop();   // moved outside the loop
     st.startIdx = st.idx;
-    st.hits = {}; st.stepMistake = false; st.rescue = false;
+    st.hits = {}; st.stepMistake = false; st.rescue = false; st.missed = {};
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
     st.viewT = targetT();
     updateStats(); updateHint();
@@ -196,6 +199,7 @@
     } else {
       wrong[m] = performance.now();
       if (readingOn()) st.rescue = true;   // reading mode: now show the key to play
+      if (isDrill()) step.notes.forEach(function (n) { st.missed[n] = step.hands[n]; });   // "notes to watch"
       if (st.startTime) { st.mistakes++; st.stepMistake = true; updateStats(); }
     }
   }
@@ -242,10 +246,11 @@
   var sheetState = { key: '', data: null };
 
   // Sheet music exists only for typed songs; MIDI files are always shown as falling notes.
-  function sheetOn() { return settings.view === 'sheet' && !(st.song && st.song.kind !== 'text'); }
+  function sheetOn() { return (settings.view === 'sheet' || isDrill()) && !(st.song && st.song.kind !== 'text'); }
+  function isDrill() { return !!(st.song && st.song.drill); }
   // Reading mode: find the notes on the sheet music yourself. The screen keyboard shows the key to play
   // (and its finger) only after a wrong key, or when a note in the score is tapped (explanation card).
-  function readingOn() { return !!settings.reading && sheetOn(); }
+  function readingOn() { return (!!settings.reading || isDrill()) && sheetOn(); }   // note reading: always
   function keyHintsOn() { return !readingOn() || !!st.rescue; }
 
   function refreshSheet() {
@@ -268,11 +273,11 @@
         var oldData = sheetState.data, sameSong = sheetState.key.split('|')[0] === st.song.id && sheetState.key.slice(-st.song.text.length) === st.song.text;
         var keepHit = explain && oldData && sameSong ? oldData.hits.indexOf(explain.hit) : -1;
         try {
-          sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale });
+          sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale, exact: isDrill() });
           var room = geo.kbTop - 8;   // grew taller (very high/low notes)? draw it a bit smaller
           if (sheetState.data.height > room && scale > 0.5) {
             sheetState.data = Sheet.render($('#sheetSvg'), st.song.text,
-              { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height) });
+              { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height), exact: isDrill() });
           }
           sheetState.key = key;
           var again = keepHit >= 0 && sheetState.data.hits[keepHit];
@@ -505,8 +510,55 @@
         '<span>' + t('resTime') + '</span><b>' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) + '</b>' +
       '</div>' +
       '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>';
+    var watch = drillWatch();
+    if (isDrill()) {
+      var wl = el('div', 'result-note watch', watch.length ? t('drillWatch', { list: watch.map(function (w) { return localNoteName(w.name); }).join(', ') }) : t('drillAllRight'));
+      $('#resBody').appendChild(wl);
+    }
+    $('#btnAgain').lastElementChild.textContent = t(isDrill() ? 'drillNew' : 'playAgain');
+    $('#btnDrillFocus').hidden = !(isDrill() && watch.length);
     openModal('mResult');
     releaseWakeLock();
+  }
+
+  // ---------------------------------------------------------------- note reading drills (js/drills.js)
+  // A fresh round of the level; focus = notes to practise more ([{ name, hand }]).
+  function startDrill(id, focus) {
+    var text = Drills.generate(id, { focus: focus });
+    st.hand = 'B';   // a round may use both hands
+    document.querySelectorAll('#handSeg button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-hand') === 'B'); });
+    closeAll();
+    loadSong({ id: 'drill:' + id, title: '', kind: 'text', text: text, notes: parseSongText(text).notes, drill: id });
+  }
+  // The notes read wrong in this round, low to high: [{ name: "F#4", hand }]
+  function drillWatch() {
+    if (!isDrill() || !st.missed) return [];
+    return Object.keys(st.missed).map(Number).sort(function (a, b) { return a - b; }).map(function (m) {
+      var n = st.song.notes.filter(function (x) { return x.m === m; })[0];
+      return { name: n && n.s ? n.s : midiToName(m), hand: st.missed[m] };
+    });
+  }
+  // The "Note reading" section of the song list.
+  function drillSectionEl() {
+    var det = el('details', 'section drills');
+    det.open = sectionOpen.drills != null ? sectionOpen.drills : isDrill();
+    var sum = el('summary', '', t('drillSection'));
+    sum.addEventListener('click', function () { sectionOpen.drills = !det.open; });
+    det.appendChild(sum);
+    det.appendChild(el('p', 'muted small', t('drillIntro')));
+    var ul = el('ul', 'songlist');
+    Drills.LEVELS.forEach(function (lv, i) {
+      var li = el('li', st.song && st.song.drill === lv.id ? 'current' : '');
+      var pick = el('button', 'pick');
+      pick.type = 'button';
+      pick.appendChild(el('span', 'name', (i + 1) + '. ' + t(lv.name)));
+      pick.appendChild(el('span', 'meta', Drills.describe(lv) + bestLabel({ id: 'drill:' + lv.id })));
+      pick.onclick = function () { startDrill(lv.id); };
+      li.appendChild(pick);
+      ul.appendChild(li);
+    });
+    det.appendChild(ul);
+    return det;
   }
 
   // ---------------------------------------------------------------- note input (all sources)
@@ -1235,6 +1287,7 @@
     var box = $('#songList');
     box.innerHTML = '';
     $('#libHint').hidden = !songs.length;
+    box.appendChild(drillSectionEl());
     if (!songs.length) { box.appendChild(el('p', 'muted', t('noSongs'))); return; }
     var ordered = songs.slice().sort(function (a, b) { return (b.recent || 0) - (a.recent || 0); });
     var loose = [], starters = [], groups = [], byName = {};
@@ -1731,8 +1784,8 @@
   showFingerToggle();
   function showViewToggle() {
     var b = $('#btnView'), midi = !!(st.song && st.song.kind !== 'text');
-    b.disabled = midi;
-    b.title = t(midi ? 'sheetMidi' : 'sheetTitle');
+    b.disabled = midi || isDrill();
+    b.title = t(midi ? 'sheetMidi' : isDrill() ? 'drillAlwaysSheet' : 'sheetTitle');
     b.classList.toggle('on', sheetOn());
     b.setAttribute('aria-pressed', sheetOn() ? 'true' : 'false');
     showReadToggle();   // reading mode needs the sheet music
@@ -1747,8 +1800,8 @@
   showViewToggle();
   function showReadToggle() {
     var b = $('#btnRead'), on = readingOn();
-    b.disabled = !sheetOn();
-    b.title = t(sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
+    b.disabled = !sheetOn() || isDrill();
+    b.title = t(isDrill() ? 'drillAlwaysRead' : sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
@@ -1761,7 +1814,11 @@
     dirty = true;
   };
   showReadToggle();
-  $('#btnAgain').onclick = function () { closeModal('mResult'); restart(st.startIdx); };   // same section again
+  $('#btnAgain').onclick = function () {
+    if (isDrill()) { startDrill(st.song.drill); return; }   // note reading: new notes
+    closeModal('mResult'); restart(st.startIdx);   // same section again
+  };
+  $('#btnDrillFocus').onclick = function () { if (isDrill()) startDrill(st.song.drill, drillWatch()); };
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
   // Don't leave the practice bar focused: Space/Enter would press the last button again.

@@ -42,7 +42,9 @@ var Sheet = (function () {
   // Parsed song -> bars; each bar has, per hand, a list of notes/chords/rests in order.
   // With a pickup the first bar is short (bar.pickup), and so is the last one if the music
   // ends that much early, as in printed music.
-  function layoutBars(p) {
+  // exact: each note lasts only its typed length (note reading drills: every note a quarter note,
+  // with rests in the other hand) instead of until the hand's next note.
+  function layoutBars(p, exact) {
     var barLen = p.meter[0] * 4 / p.meter[1], pick = p.pickup || 0;
     var rests = p.rests.map(function (t) { return snap(t / BEAT_SEC); });
     var bars = [];
@@ -71,6 +73,7 @@ var Sheet = (function () {
         for (var r = 0; r < rests.length; r++) {                            // next rest
           if (rests[r] > c.b + EPS) { end = Math.min(end, rests[r]); break; }
         }
+        if (exact) end = Math.min(end, c.b + snap(Math.max.apply(null, c.notes.map(function (n) { return n.d; })) / 0.92 / BEAT_SEC));
         c.len = Math.max(0.125, end - c.b);
       });
 
@@ -146,7 +149,7 @@ var Sheet = (function () {
   // Returns { width, height, marks: { beatKey: [{ hand, x, el }] } } (x in px, already scaled).
   function render(container, text, opts) {
     var VF = Vex.Flow;
-    var lay = layoutBars(parseSongText(text));
+    var lay = layoutBars(parseSongText(text), opts.exact);
     var YT = 45, YB = 160, H = 290, s = opts.scale || 1;   // treble / bass stave tops, total height
     var widths = lay.bars.map(function (bar, i) {
       var n = Math.max(bar.R.length, bar.L.length);

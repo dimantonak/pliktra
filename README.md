@@ -59,6 +59,10 @@ and **restore** it later or on another device.
   (or point at it with a mouse). A card explains it: its name, how many beats it lasts, where the
   note sits on the staff, ♯/♭/♮, ties, finger numbers. The note's keys light up on the keyboard,
   and *Play* lets you hear it. *Settings → What the symbols mean* lists them all with pictures.
+- **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
+  middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
+  can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
+  missed, and *Practise these notes* makes a round with more of them.
 - **Reading mode** (👁 Read, with the sheet music): the screen keyboard no longer shows which key to play,
   so you read the notes from the sheet music instead. After a wrong key the right one lights up; tapping a
   note in the score shows its keys too.
@@ -94,6 +98,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/midifile.js` - `.mid` file reader
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
+- `js/drills.js` - note reading drills (generates the rounds)
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
 - `tests/` - automated tests: `node --test tests/`
