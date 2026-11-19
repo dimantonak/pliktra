@@ -45,13 +45,21 @@
 
   var savedSettings = store.get('pliktra.settings', {});
   var settings = Object.assign({ labels: 'all', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'sheet',
-    listenSpeed: '1', listenOnPiano: true }, savedSettings);
+    listenSpeed: '1', listenOnPiano: true, lang: 'auto' }, savedSettings);
   if ((savedSettings.v || 1) < 2) {   // v2: sheet music and note names on all keys became the defaults
     settings.view = 'sheet';
     settings.labels = 'all';
   }
   settings.v = 2;
   store.set('pliktra.settings', settings);
+  LANG = pickLang(settings.lang);
+  applyI18n();
+
+  // Song title in the user's language (built-in songs are stored with English titles).
+  function songName(s) {
+    var tr = s && s.kind === 'text' && BUILTIN_TITLES[LANG];
+    return (tr && tr[s.title]) || (s ? s.title : '');
+  }
   var songs = store.get('pliktra.songs', null);
   var seenBuiltins = store.get('pliktra.builtinsSeen', null);
   if (!Array.isArray(songs)) {
@@ -80,7 +88,7 @@
 
   function saveSongs() {
     if (!store.set('pliktra.songs', songs)) {
-      alert('This device’s storage for this app is full. Delete a long song and try again.');
+      alert(t('storageFull'));
       return false;
     }
     return true;
@@ -114,7 +122,7 @@
   function loadSong(song) {
     st.song = song;
     store.set('pliktra.lastSong', song ? song.id : null);
-    $('#songTitle').textContent = song ? song.title : 'No song loaded';
+    $('#songTitle').textContent = song ? songName(song) : t('noSong');
     showViewToggle();
     rebuildSteps();
   }
@@ -188,8 +196,8 @@
     prog.max = Math.max(0, n - 1);
     prog.value = Math.min(st.idx, Math.max(0, n - 1));
     $('#stepCount').textContent = Math.min(st.idx + (st.finished ? 0 : 1), n) + ' / ' + n +
-      (loopOn() ? ' · loop ' + (loop.a + 1) + '–' + (loop.b + 1) : '');
-    $('#mistakes').textContent = 'Mistakes ' + st.mistakes;
+      (loopOn() ? ' · ' + t('loopShort') + ' ' + (loop.a + 1) + '–' + (loop.b + 1) : '');
+    $('#mistakes').textContent = t('mistakes', { n: st.mistakes });
     updateSheetCursor(false);
   }
 
@@ -209,8 +217,8 @@
     if (!sheetOn() || !geo) return;
     box.style.height = geo.kbTop + 'px';
     var msg = '';
-    if (!st.song) msg = 'Choose a song to see its sheet music.';
-    else if (!sheetLib) msg = 'The sheet music could not be loaded. Check the internet connection and reload.';
+    if (!st.song) msg = t('sheetChoose');
+    else if (!sheetLib) msg = t('sheetNoLib');
     if (!msg) {
       var scale = Math.max(0.5, Math.min(1.5, (geo.kbTop - 8) / 290));
       var key = [st.song.id, settings.fingers, scale.toFixed(3), st.song.text].join('|');
@@ -226,7 +234,7 @@
         } catch (e) {
           if (window.console) console.error(e);
           sheetState.data = null; sheetState.key = '';
-          msg = 'This song can’t be shown as sheet music yet.';
+          msg = t('sheetFail');
         }
       }
     }
@@ -281,14 +289,15 @@
 
   function updateHint() {
     var h = '';
-    if (!st.song) h = 'Tap “Songs” to choose a song';
-    else if (!st.steps.length) h = st.hand === 'L' ? 'This song has no left-hand notes' : st.hand === 'R' ? 'This song has no right-hand notes' : 'This song has no notes';
-    else if (demo) h = 'Listening… then play it yourself';
-    else if (loop.pending) h = 'Loop: move the slider (or play on) to the last step of the part, then tap “Set end”';
+    if (!st.song) h = t('hintChoose');
+    else if (!st.steps.length) h = t(st.hand === 'L' ? 'hintNoLeft' : st.hand === 'R' ? 'hintNoRight' : 'hintNoNotes');
+    else if (demo) h = t('hintListening');
+    else if (loop.pending) h = t('hintLoop');
     else if (loopOn() && loop.laps && !st.startTime) {
-      h = 'Round ' + loop.laps + ': ' + (loop.lastMistakes ? loop.lastMistakes + ' wrong key' + (loop.lastMistakes > 1 ? 's' : '') : 'no wrong keys!') + ' — again';
+      var res = !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
+      h = t('hintRound', { n: loop.laps, result: res });
     }
-    else if (!st.startTime && !st.finished) h = 'Play the highlighted key to start';
+    else if (!st.startTime && !st.finished) h = t('hintStart');
     $('#hint').textContent = h;
   }
 
@@ -302,18 +311,18 @@
     var prev = best[key];
     var isBest = full && (prev == null || acc > prev);
     if (isBest) { best[key] = acc; store.set('pliktra.best', best); }
-    var handName = { B: 'both hands', R: 'right hand', L: 'left hand' }[st.hand];
-    var note = !full ? 'Started from step ' + (st.startIdx + 1) + ', so this run isn’t counted as a best score.'
-      : isBest ? (prev == null ? 'First score saved!' : 'New best! (was ' + prev + '%)')
-      : 'Your best: ' + prev + '%';
+    var handName = t('hands' + st.hand);
+    var note = !full ? t('resPartial', { n: st.startIdx + 1 })
+      : isBest ? (prev == null ? t('resFirst') : t('resNewBest', { p: prev }))
+      : t('resBest', { p: prev });
     $('#resBody').innerHTML =
       '<div class="result-big">' + acc + '%</div>' +
-      '<div class="result-sub">steps played without a wrong key</div>' +
+      '<div class="result-sub">' + t('resultSub') + '</div>' +
       '<div class="result-lines">' +
-        '<span>Hands</span><b>' + handName + '</b>' +
-        '<span>Steps</span><b>' + total + '</b>' +
-        '<span>Wrong keys</span><b>' + st.mistakes + '</b>' +
-        '<span>Time</span><b>' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) + '</b>' +
+        '<span>' + t('resHands') + '</span><b>' + handName + '</b>' +
+        '<span>' + t('resSteps') + '</span><b>' + total + '</b>' +
+        '<span>' + t('resWrong') + '</span><b>' + st.mistakes + '</b>' +
+        '<span>' + t('resTime') + '</span><b>' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) + '</b>' +
       '</div>' +
       '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>';
     openModal('mResult');
@@ -350,7 +359,7 @@
 
   function updateHeld() {
     var ms = Object.keys(held).map(Number).sort(function (a, b) { return a - b; });
-    $('#held').textContent = ms.length ? '♪ ' + ms.map(midiToName).join(' ') : '';
+    $('#held').textContent = ms.length ? '♪ ' + ms.map(function (m) { return localNoteName(midiToName(m)); }).join(' ') : '';
   }
 
   // ---------------------------------------------------------------- Web MIDI
@@ -364,7 +373,7 @@
 
   function initMidi() {
     if (!navigator.requestMIDIAccess) {
-      setStatus('This browser can’t read MIDI — use Chrome', 'bad');
+      setStatus(t('midiNoBrowser'), 'bad');
       return;
     }
     navigator.requestMIDIAccess({ sysex: false }).then(function (access) {
@@ -372,7 +381,7 @@
       access.onstatechange = bindInputs;
       bindInputs();
     }, function () {
-      setStatus('MIDI blocked — allow it via the lock icon in the address bar, then reload', 'bad');
+      setStatus(t('midiBlocked'), 'bad');
     });
   }
 
@@ -383,7 +392,7 @@
       if (input.state === 'connected') names.push(input.name);
     });
     if (names.length) setStatus('🎹 ' + names.join(', '), 'ok');
-    else setStatus('No piano connected', 'warn');
+    else setStatus(t('midiNone'), 'warn');
     if (e && e.port && e.port.state === 'disconnected') releaseMidiNotes();
   }
 
@@ -685,7 +694,7 @@
         }
         if (settings.laneLabels && active && r.w >= 16 && nameFits) {
           ctx.fillStyle = '#0b1220';
-          var label = r.w >= 30 ? noteLabel(n) : noteLabel(n).replace(/-?\d+$/, '');
+          var label = localNoteName(r.w >= 30 ? noteLabel(n) : noteLabel(n).replace(/-?\d+$/, ''));
           ctx.fillText(label, r.x + r.w / 2, labelY);
         }
       }
@@ -726,7 +735,7 @@
       // labels
       var showLabel = settings.labels === 'all' || (settings.labels === 'C' && m % 12 === 0);
       if (showLabel && ww >= 14) {
-        var txt = (m % 12 === 0 || ww >= 26) ? midiToName(m) : midiToName(m).replace(/-?\d+$/, '');
+        var txt = localNoteName((m % 12 === 0 || ww >= 26) ? midiToName(m) : midiToName(m).replace(/-?\d+$/, ''));
         if (settings.labels === 'all' && m % 12 !== 0 && ww < 26) txt = txt.charAt(0);
         ctx.fillStyle = m === 60 ? '#1d6fe0' : '#5b6472';
         ctx.font = (m === 60 ? '700 ' : '500 ') + Math.min(14, Math.max(9, ww * 0.32)) + 'px system-ui, sans-serif';
@@ -820,7 +829,9 @@
   cv.addEventListener('pointercancel', pointerEnd);
 
   // ---------------------------------------------------------------- computer keyboard (for testing without a piano)
-  var KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16 };
+  // By physical key position (KeyboardEvent.code), so it works on QWERTY, QWERTZ and other layouts.
+  var KEYMAP = { KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10,
+    KeyJ: 11, KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16 };
   var kbOct = 4, kbDown = {};
   // True only while typing text (the slider, buttons and checkboxes don't block the keyboard piano).
   function typing(e) {
@@ -831,10 +842,10 @@
   }
   window.addEventListener('keydown', function (e) {
     if (typing(e) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    var k = e.key.toLowerCase();
-    if (k in KEYMAP || k === 'z' || k === 'x') e.preventDefault();
-    if (k === 'z') { kbOct = Math.max(1, kbOct - 1); return; }
-    if (k === 'x') { kbOct = Math.min(7, kbOct + 1); return; }
+    var k = e.code;
+    if (k in KEYMAP || k === 'KeyZ' || k === 'KeyX') e.preventDefault();
+    if (k === 'KeyZ') { kbOct = Math.max(1, kbOct - 1); return; }
+    if (k === 'KeyX') { kbOct = Math.min(7, kbOct + 1); return; }
     if (k in KEYMAP && kbDown[k] == null) {
       var m = 12 * (kbOct + 1) + KEYMAP[k];
       if (m > 108) return;
@@ -843,7 +854,7 @@
     }
   });
   window.addEventListener('keyup', function (e) {
-    var k = e.key.toLowerCase();
+    var k = e.code;
     if (kbDown[k] != null) { var m = kbDown[k]; delete kbDown[k]; noteOff(m, 'kbd'); }
   });
   window.addEventListener('blur', function () {
@@ -870,7 +881,7 @@
     return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? editing.title : '');
   }
   function dismissModal(id) {
-    if (id === 'mEditor' && editorChanged() && !confirm('Close the editor without saving?')) return;
+    if (id === 'mEditor' && editorChanged() && !confirm(t('confirmCloseEditor'))) return;
     closeModal(id);
   }
   document.querySelectorAll('.modal').forEach(function (m) {
@@ -888,7 +899,7 @@
   function handsLabel(notes) {
     var r = false, l = false;
     notes.forEach(function (n) { if (n.h === 'R') r = true; else l = true; });
-    return r && l ? 'both hands' : r ? 'right hand' : 'left hand';
+    return t(r && l ? 'handsB' : r ? 'handsR' : 'handsL');
   }
 
   function el(tag, cls, text) {
@@ -901,29 +912,29 @@
   function renderLibrary() {
     var ul = $('#songList');
     ul.innerHTML = '';
-    if (!songs.length) { ul.appendChild(el('li', 'muted', 'No songs yet. Create one or import a MIDI file.')); return; }
+    if (!songs.length) { ul.appendChild(el('li', 'muted', t('noSongs'))); return; }
     songs.forEach(function (s) {
       var li = el('li', st.song && st.song.id === s.id ? 'current' : '');
       var info = el('div', 'info');
-      info.appendChild(el('div', 'name', s.title));
+      info.appendChild(el('div', 'name', songName(s)));
       var b = best[s.id + ':B'];
-      var meta = buildSteps(s.notes, 'B').length + ' steps · ' + handsLabel(s.notes) +
-        ' · ' + (s.kind === 'midi' ? 'MIDI file' : 'typed') + (b != null ? ' · best ' + b + '%' : '');
+      var meta = t('metaSteps', { n: buildSteps(s.notes, 'B').length }) + ' · ' + handsLabel(s.notes) +
+        ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + (b != null ? ' · ' + t('metaBest', { p: b }) : '');
       info.appendChild(el('div', 'meta', meta));
       li.appendChild(info);
 
-      var play = el('button', 'btn primary small', 'Practise');
+      var play = el('button', 'btn primary small', t('practise'));
       play.onclick = function () { closeAll(); loadSong(s); };
-      var edit = el('button', 'btn small', s.kind === 'midi' ? 'Rename' : 'Edit');
+      var edit = el('button', 'btn small', t(s.kind === 'midi' ? 'rename' : 'edit'));
       edit.onclick = function () {
         if (s.kind === 'midi') {
-          var t = prompt('Song title', s.title);
-          if (t && t.trim()) { s.title = t.trim(); saveSongs(); renderLibrary(); if (st.song === s) $('#songTitle').textContent = s.title; }
+          var nt = prompt(t('songTitlePrompt'), s.title);
+          if (nt && nt.trim()) { s.title = nt.trim(); saveSongs(); renderLibrary(); if (st.song === s) $('#songTitle').textContent = songName(s); }
         } else openEditor(s);
       };
-      var del = el('button', 'btn small danger', 'Delete');
+      var del = el('button', 'btn small danger', t('del'));
       del.onclick = function () {
-        if (!confirm('Delete “' + s.title + '”?')) return;
+        if (!confirm(t('confirmDelete', { t: songName(s) }))) return;
         songs = songs.filter(function (x) { return x !== s; });
         saveSongs();
         ['B', 'R', 'L'].forEach(function (h) { delete best[s.id + ':' + h]; });
@@ -933,7 +944,7 @@
       };
       li.appendChild(play); li.appendChild(edit);
       if (s.kind !== 'midi') {
-        var share = el('button', 'btn small', 'Share');
+        var share = el('button', 'btn small', t('share'));
         share.onclick = function () { shareSong(s); };
         li.appendChild(share);
       }
@@ -963,13 +974,13 @@
     if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () { /* cancelled */ }); return; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
-        alert('Link copied. Open it on another device to add ' + what + ' there.');
-      }, function () { prompt('Copy this link:', url); });
+        alert(t('linkCopied', { what: what }));
+      }, function () { prompt(t('copyLink'), url); });
       return;
     }
-    prompt('Copy this link:', url);
+    prompt(t('copyLink'), url);
   }
-  function shareSong(song) { shareLink({ t: song.title, s: song.text }, song.title, '“' + song.title + '”'); }
+  function shareSong(song) { shareLink({ t: song.title, s: song.text }, songName(song), '“' + songName(song) + '”'); }
 
   // Song entries in links and backup files: typed {t, s}, MIDI {t, k: 'midi', n: [[m, t, d, h], ...]},
   // plus b = best scores {B, R, L} in backup files.
@@ -1003,13 +1014,13 @@
     if (!valid) { alert(damagedMsg); return null; }
     var toAdd = [], toUpdate = [], same = [];
     for (var i = 0; i < list.length; i++) {
-      var d = list[i], isMidi = d.k === 'midi', title = d.t.trim().slice(0, 120) || 'Shared song', notes;
+      var d = list[i], isMidi = d.k === 'midi', title = d.t.trim().slice(0, 120) || t('sharedSong'), notes;
       if (isMidi) {
         notes = d.n.map(function (x) { return { m: x[0], t: x[1], d: x[2], h: x[3] }; });
         sortNotes(notes);
       } else {
         var r = parseSongText(d.s);
-        if (r.errors.length || !r.notes.length) { alert('“' + title + '” contains mistakes and can’t be added.'); return null; }
+        if (r.errors.length || !r.notes.length) { alert(t('songHasMistakes', { t: title })); return null; }
         notes = r.notes;
       }
       var match = songs.filter(function (x) { return x.title === title && (x.kind === 'midi') === isMidi; })[0];
@@ -1019,7 +1030,7 @@
       else toAdd.push(item);
     }
     function names(arr) {
-      return arr.length > 4 ? arr.length + ' songs' : arr.map(function (x) { return '“' + x.title + '”'; }).join(', ');
+      return arr.length > 4 ? t('nSongs', { n: arr.length }) : arr.map(function (x) { return '“' + songName(x.song || { title: x.title }) + '”'; }).join(', ');
     }
     function mergeBest(item) {   // keep the better score
       if (!item.d.b || !item.song) return;
@@ -1030,9 +1041,10 @@
     }
     if (toAdd.length || toUpdate.length) {
       var question = [];
-      if (toAdd.length) question.push('Add ' + names(toAdd) + ' to your songs');
-      if (toUpdate.length) question.push((toAdd.length ? 'update ' : 'Update ') + names(toUpdate) + ' with the version in the ' + (fromBackup ? 'backup' : 'link'));
-      if (!confirm(question.join(' and ') + '?')) return null;
+      var src = t(fromBackup ? 'srcBackup' : 'srcLink');
+      if (toAdd.length) question.push(t('askAdd', { names: names(toAdd) }));
+      if (toUpdate.length) question.push(t(toAdd.length ? 'askUpdateLower' : 'askUpdate', { names: names(toUpdate), src: src }));
+      if (!confirm(question.join(t('and')) + '?')) return null;
       var old = toUpdate.map(function (u) { return { text: u.song.text, notes: u.song.notes }; });
       toUpdate.forEach(function (u) { if (!u.isMidi) u.song.text = u.d.s; u.song.notes = u.notes; });
       var created = toAdd.map(function (x) {
@@ -1046,7 +1058,7 @@
         return null;
       }
     } else if (fromBackup) {
-      alert('All songs in this backup are already here.');
+      alert(t('backupSame'));
     }
     same.concat(toUpdate, toAdd).forEach(mergeBest);
     store.set('pliktra.best', best);
@@ -1061,7 +1073,7 @@
     var data = null;
     try { data = JSON.parse(b64urlDecode(m[1])); } catch (e) { /* handled below */ }
     // A link holds one song {t, s} or a list of them [{t, s}, ...]
-    var song = importSongs(Array.isArray(data) ? data : data ? [data] : null, 'This song link is damaged.', false);
+    var song = importSongs(Array.isArray(data) ? data : data ? [data] : null, t('linkDamaged'), false);
     if (!song) return false;
     closeAll();
     loadSong(song);
@@ -1071,9 +1083,9 @@
   // ---- all songs: share link (typed songs), backup file (everything, with best scores), restore
   $('#btnShareAll').onclick = function () {
     var typed = songs.filter(function (s) { return s.kind !== 'midi'; });
-    if (!typed.length) { alert('There are no typed songs to share yet.'); return; }
-    shareLink(typed.map(function (s) { return songEntry(s, false); }), 'Pliktra songs',
-      typed.length === 1 ? '“' + typed[0].title + '”' : 'these ' + typed.length + ' songs');
+    if (!typed.length) { alert(t('noTypedSongs')); return; }
+    shareLink(typed.map(function (s) { return songEntry(s, false); }), t('allSongsTitle'),
+      typed.length === 1 ? '“' + songName(typed[0]) + '”' : t('theseSongs', { n: typed.length }));
   };
   $('#btnBackup').onclick = function () {
     var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }) };
@@ -1090,7 +1102,7 @@
     f.text().then(function (txt) {
       var data = null;
       try { data = JSON.parse(txt); } catch (err) { /* handled below */ }
-      importSongs(data && data.app === 'pliktra' ? data.songs : null, 'This is not a Pliktra backup file, or it is damaged.', true);
+      importSongs(data && data.app === 'pliktra' ? data.songs : null, t('backupDamaged'), true);
       renderLibrary();
     });
   });
@@ -1111,8 +1123,8 @@
 
   function validateEditor() {
     var r = parseSongText($('#edText').value);
-    $('#edInfo').textContent = r.steps ? r.steps + ' steps · ' + handsLabel(r.notes) : '';
-    $('#edError').textContent = r.errors.slice(0, 5).join('\n') + (r.errors.length > 5 ? '\n…and ' + (r.errors.length - 5) + ' more' : '');
+    $('#edInfo').textContent = r.steps ? t('edInfo', { n: r.steps, hands: handsLabel(r.notes) }) : '';
+    $('#edError').textContent = r.errors.slice(0, 5).join('\n') + (r.errors.length > 5 ? '\n' + t('moreErrors', { n: r.errors.length - 5 }) : '');
     return r;
   }
 
@@ -1120,7 +1132,7 @@
     recording = on;
     var b = $('#btnRecord');
     b.classList.toggle('on', on);
-    b.textContent = on ? '■ Stop recording' : '● Record from piano';
+    b.textContent = t(on ? 'stopRecord' : 'record');
   }
 
   function recordNote(m) {
@@ -1140,7 +1152,7 @@
 
   $('#btnRecord').onclick = function () { setRecording(!recording); };
   $('#btnClearText').onclick = function () {
-    if ($('#edText').value && !confirm('Clear all notes?')) return;
+    if ($('#edText').value && !confirm(t('confirmClear'))) return;
     $('#edText').value = ''; validateEditor();
   };
   $('#edText').addEventListener('input', validateEditor);
@@ -1149,8 +1161,8 @@
   $('#btnSaveSong').onclick = function () {
     var r = validateEditor();
     if (r.errors.length) return;
-    if (!r.notes.length) { $('#edError').textContent = 'Add some notes first.'; return; }
-    var title = $('#edTitle').value.trim() || 'Untitled song';
+    if (!r.notes.length) { $('#edError').textContent = t('addNotes'); return; }
+    var title = $('#edTitle').value.trim() || t('untitled');
     var song = editing;
     if (song) { song.title = title; song.text = $('#edText').value; song.notes = r.notes; }
     else { song = songFromText(title, $('#edText').value); songs.unshift(song); }
@@ -1168,10 +1180,10 @@
     if (!f) return;
     f.arrayBuffer().then(function (buf) {
       var mf = parseMidiFile(buf);
-      if (!mf.parts.length) throw new Error('No piano notes were found in this file.');
+      if (!mf.parts.length) throw new Error(t('midiNoNotes'));
       openImport(f.name.replace(/\.(mid|midi)$/i, ''), mf);
     }).catch(function (err) {
-      alert('Could not read this MIDI file.\n' + (err && err.message ? err.message : err));
+      alert(t('midiReadFail') + '\n' + (err && err.message ? err.message : err));
     });
   });
 
@@ -1191,10 +1203,10 @@
       var tr = el('tr');
       tr.appendChild(el('td', '', p.name));
       tr.appendChild(el('td', '', String(p.notes.length)));
-      tr.appendChild(el('td', '', midiToName(p.min) + ' – ' + midiToName(p.max)));
+      tr.appendChild(el('td', '', localNoteName(midiToName(p.min)) + ' – ' + localNoteName(midiToName(p.max))));
       var td = el('td'), sel = el('select');
-      [['R', 'Right hand'], ['L', 'Left hand'], ['S', 'Split at middle C'], ['X', 'Skip']].forEach(function (o) {
-        var opt = el('option', '', o[1]); opt.value = o[0]; sel.appendChild(opt);
+      [['R', 'rightHand'], ['L', 'leftHand'], ['S', 'split'], ['X', 'skip']].forEach(function (o) {
+        var opt = el('option', '', t(o[1])); opt.value = o[0]; sel.appendChild(opt);
       });
       sel.value = p.assign;
       sel.onchange = function () { p.assign = sel.value; };
@@ -1213,11 +1225,11 @@
         notes.push({ m: n.m, t: n.t, d: n.d, h: p.assign === 'S' ? (n.m >= 60 ? 'R' : 'L') : p.assign });
       });
     });
-    if (!notes.length) { alert('Choose a hand for at least one part.'); return; }
+    if (!notes.length) { alert(t('chooseHand')); return; }
     var t0 = notes.reduce(function (a, n) { return Math.min(a, n.t); }, Infinity);
     notes.forEach(function (n) { n.t = Math.round((n.t - t0) * 1000) / 1000; n.d = Math.round(n.d * 1000) / 1000; });
     sortNotes(notes);
-    var song = { id: newId(), title: $('#imTitle').value.trim() || 'Imported song', kind: 'midi', notes: notes };
+    var song = { id: newId(), title: $('#imTitle').value.trim() || t('importedSong'), kind: 'midi', notes: notes };
     songs.unshift(song);
     if (!saveSongs()) { songs.shift(); return; }
     pendingImport = null;
@@ -1241,6 +1253,12 @@
   bindSetting('setSound', 'sound', true);
   bindSetting('setListenSpeed', 'listenSpeed');
   bindSetting('setListenOnPiano', 'listenOnPiano', true);
+  $('#setLang').value = I18N[settings.lang] ? settings.lang : 'auto';
+  $('#setLang').addEventListener('change', function () {
+    settings.lang = $('#setLang').value;
+    store.set('pliktra.settings', settings);
+    location.reload();
+  });
 
   // ---------------------------------------------------------------- top bar wiring
   $('#btnSongs').onclick = function () { renderLibrary(); openModal('mLibrary'); };
@@ -1252,7 +1270,7 @@
     b.classList.toggle('on', !!demo);
     b.setAttribute('aria-pressed', demo ? 'true' : 'false');
     b.querySelector('.ico').textContent = demo ? '■' : '▶︎';
-    b.querySelector('.lbl').textContent = demo ? ' Stop' : ' Listen';
+    b.querySelector('.lbl').textContent = t(demo ? 'stop' : 'listen');
   }
   $('#btnListen').onclick = function () { if (demo) stopDemo(); else startDemo(); };
 
@@ -1261,7 +1279,7 @@
     b.classList.toggle('on', loopOn());
     b.classList.toggle('pending', loop.pending);
     b.setAttribute('aria-pressed', loopOn() ? 'true' : 'false');
-    b.querySelector('.lbl').textContent = loop.pending ? ' Set end' : loopOn() ? ' Loop ' + (loop.a + 1) + '–' + (loop.b + 1) : ' Loop';
+    b.querySelector('.lbl').textContent = loop.pending ? t('setEnd') : loopOn() ? t('loopRange', { a: loop.a + 1, b: loop.b + 1 }) : t('loop');
   }
   // Loop: 1st tap = start here, 2nd tap = end here (after moving the slider or playing on), 3rd tap = off.
   $('#btnLoop').onclick = function () {
@@ -1290,7 +1308,7 @@
   function showViewToggle() {
     var b = $('#btnView'), midi = !!(st.song && st.song.kind !== 'text');
     b.disabled = midi;
-    b.title = midi ? 'Sheet music is available for typed songs only' : 'Show sheet music instead of falling notes';
+    b.title = t(midi ? 'sheetMidi' : 'sheetTitle');
     b.classList.toggle('on', sheetOn());
     b.setAttribute('aria-pressed', sheetOn() ? 'true' : 'false');
   }

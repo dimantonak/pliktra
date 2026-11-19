@@ -211,7 +211,7 @@ textarea { font-family: ui-monospace, Consolas, monospace; resize: vertical; }
 .songlist li { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 10px; background: var(--panel2); }
 .songlist li.current { outline: 2px solid var(--accent); }
 .songlist .info { flex: 1; min-width: 0; }
-.songlist .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.songlist .name { font-weight: 600; overflow-wrap: anywhere; }
 .songlist .meta { font-size: 13px; color: var(--muted); }
 
 .muted { color: var(--muted); margin: 0; }

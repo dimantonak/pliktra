@@ -9,7 +9,9 @@ test('note names', () => {
   assert.equal(N.parseNoteName('F#3'), 54);
   assert.equal(N.parseNoteName('Bb2'), 46);
   assert.equal(N.parseNoteName('b3'), 59);
-  assert.equal(N.parseNoteName('H4'), null);
+  assert.equal(N.parseNoteName('H4'), 71);    // German name for B
+  assert.equal(N.parseNoteName('Hb4'), null);
+  assert.equal(N.parseNoteName('X4'), null);
   assert.equal(N.midiToName(61), 'C#4');
   assert.equal(N.spelled('Eb4'), 'Eb4');
 });

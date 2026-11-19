@@ -16,10 +16,11 @@ function midiToName(m) {
 }
 
 // "C4" -> 60, "F#3" -> 54, "Bb2" -> 46, "e" -> 64 (octave defaults to 4). null if invalid.
+// "H4" (German name for B) = "B4"; only plain H, since "Hb"/"H#" aren't used.
 function parseNoteName(s) {
-  var r = /^([A-Ga-g])([#♯b♭]?)(-?\d)?$/.exec(s);
-  if (!r) return null;
-  var base = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[r[1].toLowerCase()];
+  var r = /^([A-Ha-h])([#♯b♭]?)(-?\d)?$/.exec(s);
+  if (!r || (/h/i.test(r[1]) && r[2])) return null;
+  var base = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11, h: 11 }[r[1].toLowerCase()];
   var acc = (r[2] === '#' || r[2] === '♯') ? 1 : (r[2] === 'b' || r[2] === '♭') ? -1 : 0;
   var oct = r[3] != null ? parseInt(r[3], 10) : 4;
   var m = (oct + 1) * 12 + base + acc;
@@ -49,13 +50,13 @@ function parseSongText(text) {
         var ds = tok.slice(u + 1);
         dur = /^(\d+\.?\d*|\.\d+)$/.test(ds) ? parseFloat(ds) : NaN;   // "2", "0.5", ".5"; not "2abc"
         body = tok.slice(0, u);
-        if (!(dur > 0)) { errors.push('"' + tok + '": the length after _ must be a number'); continue; }
+        if (!(dur > 0)) { errors.push(msg('errLength', tok, 'the length after _ must be a number')); continue; }
       }
       if (body === '-') { rests.push(round3(beat * BEAT_SEC)); beat += dur; continue; }
       var tm = /^(\d+)\/(\d+)$/.exec(body);                   // time signature, e.g. 3/4
       if (tm) {
-        if (beat > 0) errors.push('"' + tok + '": a time signature can only be at the start');
-        else if (!(+tm[1] > 0) || [2, 4, 8, 16].indexOf(+tm[2]) < 0) errors.push('"' + tok + '" is not a time signature');
+        if (beat > 0) errors.push(msg('errMeterPos', tok, 'a time signature can only be at the start'));
+        else if (!(+tm[1] > 0) || [2, 4, 8, 16].indexOf(+tm[2]) < 0) errors.push(msg('errMeter', tok, 'is not a time signature'));
         else meter = [+tm[1], +tm[2]];
         continue;
       }
@@ -65,11 +66,11 @@ function parseSongText(text) {
         var name = hm ? hm[2] : parts[pi];
         var finger = null, fm = /^(.*)\/(.*)$/.exec(name);       // "E4/3" = E4 with finger 3
         if (fm) {
-          if (!/^[1-5]$/.test(fm[2])) { errors.push('"' + parts[pi] + '": the finger after / must be 1 to 5'); bad = true; break; }
+          if (!/^[1-5]$/.test(fm[2])) { errors.push(msg('errFinger', parts[pi], 'the finger after / must be 1 to 5')); bad = true; break; }
           name = fm[1]; finger = +fm[2];
         }
         var m = parseNoteName(name);
-        if (m == null) { errors.push('"' + parts[pi] + '" is not a note on the piano'); bad = true; break; }
+        if (m == null) { errors.push(msg('errNote', parts[pi], 'is not a note on the piano')); bad = true; break; }
         var dup = stepNotes.filter(function (x) { return x.m === m; })[0];   // same key twice in a chord
         if (dup) { if (!dup.f) dup.f = finger; continue; }
         stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L'), s: spelled(name), f: finger });
@@ -103,6 +104,12 @@ function spelled(name) {
 }
 
 function noteLabel(n) { return n.s || midiToName(n.m); }
+
+// Error text in the app's language (js/i18n.js), or English when it isn't loaded (e.g. in tests).
+function msg(key, tok, english) {
+  if (typeof t === 'function') return t(key, { tok: tok });
+  return '"' + tok + '"' + (english.indexOf('is ') === 0 ? ' ' : ': ') + english;
+}
 
 function round3(x) { return Math.round(x * 1000) / 1000; }
 

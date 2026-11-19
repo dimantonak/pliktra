@@ -11,24 +11,25 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Texts are translated by js/i18n.js: data-i18n (text), data-i18n-html, -title, -aria, -ph. -->
   <header class="bar topbar">
-    <button id="btnSongs" class="btn">&#9776; Songs</button>
-    <div class="title" id="songTitle">No song loaded</div>
+    <button id="btnSongs" class="btn">&#9776; <span data-i18n="songs">Songs</span></button>
+    <div class="title" id="songTitle" data-i18n="noSong">No song loaded</div>
     <div id="held" class="held"></div>
-    <div id="midiStatus" class="pill">Starting&hellip;</div>
-    <button id="btnSettings" class="btn icon" aria-label="Settings" title="Settings">&#9881;</button>
+    <div id="midiStatus" class="pill" data-i18n="starting">Starting&hellip;</div>
+    <button id="btnSettings" class="btn icon" aria-label="Settings" title="Settings" data-i18n-aria="settings" data-i18n-title="settings">&#9881;</button>
   </header>
 
   <div class="bar practicebar">
-    <div class="seg" id="handSeg" role="group" aria-label="Hands">
-      <button data-hand="B" class="on">Both</button><button data-hand="R">Right</button><button data-hand="L">Left</button>
+    <div class="seg" id="handSeg" role="group" aria-label="Hands" data-i18n-aria="hands">
+      <button data-hand="B" class="on" data-i18n="both">Both</button><button data-hand="R" data-i18n="right">Right</button><button data-hand="L" data-i18n="left">Left</button>
     </div>
-    <button id="btnRestart" class="btn" title="Restart">&#8634;<span class="lbl"> Restart</span></button>
-    <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key">&#9995;<span class="lbl"> Fingers</span></button>
-    <button id="btnView" class="btn toggle" aria-pressed="false" title="Show sheet music instead of falling notes">&#9835;<span class="lbl"> Sheet</span></button>
-    <button id="btnListen" class="btn toggle" aria-pressed="false" title="Listen to the song first"><span class="ico">&#9654;&#xFE0E;</span><span class="lbl"> Listen</span></button>
-    <button id="btnLoop" class="btn toggle" aria-pressed="false" title="Repeat a part: tap at its start, move to its end, tap again">&#10227;<span class="lbl"> Loop</span></button>
-    <input type="range" id="progress" min="0" max="0" value="0" aria-label="Position in song">
+    <button id="btnRestart" class="btn" title="Start again" data-i18n-title="restartTitle">&#8634;<span class="lbl" data-i18n="restart"> Restart</span></button>
+    <button id="btnFingers" class="btn toggle" aria-pressed="true" title="Show which finger plays each key" data-i18n-title="fingersTitle">&#9995;<span class="lbl" data-i18n="fingers"> Fingers</span></button>
+    <button id="btnView" class="btn toggle" aria-pressed="false" title="Show sheet music instead of falling notes" data-i18n-title="sheetTitle">&#9835;<span class="lbl" data-i18n="sheet"> Sheet</span></button>
+    <button id="btnListen" class="btn toggle" aria-pressed="false" title="Listen to the song first" data-i18n-title="listenTitle"><span class="ico">&#9654;&#xFE0E;</span><span class="lbl" data-i18n="listen"> Listen</span></button>
+    <button id="btnLoop" class="btn toggle" aria-pressed="false" title="Repeat a part: tap at its start, move to its end, tap again" data-i18n-title="loopTitle">&#10227;<span class="lbl" data-i18n="loop"> Loop</span></button>
+    <input type="range" id="progress" min="0" max="0" value="0" aria-label="Position in song" data-i18n-aria="position">
     <span id="stepCount" class="stat">0 / 0</span>
     <span id="mistakes" class="stat">Mistakes 0</span>
   </div>
@@ -45,18 +46,18 @@
   <!-- Song library -->
   <div class="modal" id="mLibrary">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mLibraryTitle">
-      <div class="sheet-head"><h2 id="mLibraryTitle">Songs</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+      <div class="sheet-head"><h2 id="mLibraryTitle" data-i18n="songs">Songs</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
       <div class="row gap">
-        <button id="btnNew" class="btn primary">+ New song</button>
-        <label class="btn">Import MIDI file<input type="file" id="fileMidi" accept=".mid,.midi,audio/midi,audio/x-midi" hidden></label>
+        <button id="btnNew" class="btn primary" data-i18n="newSong">+ New song</button>
+        <label class="btn"><span data-i18n="importMidi">Import MIDI file</span><input type="file" id="fileMidi" accept=".mid,.midi,audio/midi,audio/x-midi" hidden></label>
       </div>
       <ul id="songList" class="songlist"></ul>
       <div class="backup">
-        <p class="muted small">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
+        <p class="muted small" data-i18n="backupNote">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
         <div class="row gap">
-          <button id="btnShareAll" class="btn small">Share all songs</button>
-          <button id="btnBackup" class="btn small">Save backup file</button>
-          <label class="btn small">Restore backup<input type="file" id="fileRestore" accept=".json,application/json" hidden></label>
+          <button id="btnShareAll" class="btn small" data-i18n="shareAll">Share all songs</button>
+          <button id="btnBackup" class="btn small" data-i18n="saveBackup">Save backup file</button>
+          <label class="btn small"><span data-i18n="restoreBackup">Restore backup</span><input type="file" id="fileRestore" accept=".json,application/json" hidden></label>
         </div>
       </div>
     </div>
@@ -65,32 +66,22 @@
   <!-- Song editor -->
   <div class="modal" id="mEditor">
     <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="mEditorTitle">
-      <div class="sheet-head"><h2 id="mEditorTitle">Song editor</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
-      <label class="field">Title<input id="edTitle" type="text" placeholder="e.g. Ode to Joy"></label>
-      <label class="field">Notes<textarea id="edText" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="C4 D4 E4 F4 G4_2"></textarea></label>
+      <div class="sheet-head"><h2 id="mEditorTitle" data-i18n="editor">Song editor</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
+      <label class="field"><span data-i18n="title">Title</span><input id="edTitle" type="text" placeholder="e.g. Ode to Joy" data-i18n-ph="titlePh"></label>
+      <label class="field"><span data-i18n="notes">Notes</span><textarea id="edText" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="C4 D4 E4 F4 G4_2"></textarea></label>
       <div class="row gap">
-        <button id="btnRecord" class="btn rec">&#9679; Record from piano</button>
-        <button id="btnClearText" class="btn">Clear</button>
+        <button id="btnRecord" class="btn rec" data-i18n="record">&#9679; Record from piano</button>
+        <button id="btnClearText" class="btn" data-i18n="clear">Clear</button>
         <span id="edInfo" class="muted"></span>
       </div>
       <div id="edError" class="error"></div>
       <details class="help">
-        <summary>How to write notes</summary>
-        <ul>
-          <li>One step per word: <code>C4 D4 E4</code>. The number is the octave; <code>C4</code> is middle C.</li>
-          <li>Sharps and flats: <code>F#4</code>, <code>Bb3</code>.</li>
-          <li>Keys played together (chord): join with <code>+</code>, e.g. <code>C4+E4+G4</code>.</li>
-          <li>Hands: notes below middle C go to the left hand, the rest to the right. Force a hand with <code>L:</code> or <code>R:</code>, e.g. <code>L:C4+R:E4</code>.</li>
-          <li>Fingers: add <code>/</code> and the finger after a note: <code>E4/3</code>, <code>G3/4+B3/2</code>. 1 = thumb, 2 = index, 3 = middle, 4 = ring, 5 = little finger (same numbers for both hands).</li>
-          <li>Length in beats: <code>C4_2</code> = 2 beats, <code>G4_0.5</code> = half a beat (1 beat = a quarter note). <code>-</code> is a rest, <code>-_2</code> a 2-beat rest.</li>
-          <li>Time signature: write it first, e.g. <code>3/4</code> or <code>6/8</code> (default 4/4). It sets the bars in the sheet music.</li>
-          <li>Bar lines <code>|</code> and anything after <code>//</code> are ignored.</li>
-          <li><b>Record from piano</b> adds what you play on the piano to the end of the text.</li>
-        </ul>
+        <summary data-i18n="howTo">How to write notes</summary>
+        <ul data-i18n-html="helpHtml"></ul>
       </details>
       <div class="row end gap">
-        <button class="btn" data-close>Cancel</button>
-        <button id="btnSaveSong" class="btn primary">Save &amp; practise</button>
+        <button class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="btnSaveSong" class="btn primary" data-i18n="savePractise">Save &amp; practise</button>
       </div>
     </div>
   </div>
@@ -98,16 +89,16 @@
   <!-- MIDI import -->
   <div class="modal" id="mImport">
     <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="mImportTitle">
-      <div class="sheet-head"><h2 id="mImportTitle">Import MIDI file</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
-      <label class="field">Title<input id="imTitle" type="text"></label>
-      <p class="muted">Choose which hand plays each part of the file.</p>
+      <div class="sheet-head"><h2 id="mImportTitle" data-i18n="importTitle">Import MIDI file</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
+      <label class="field"><span data-i18n="title">Title</span><input id="imTitle" type="text"></label>
+      <p class="muted" data-i18n="importHelp">Choose which hand plays each part of the file.</p>
       <table class="parts">
-        <thead><tr><th>Part</th><th>Notes</th><th>Range</th><th>Hand</th></tr></thead>
+        <thead><tr><th data-i18n="part">Part</th><th data-i18n="notes">Notes</th><th data-i18n="range">Range</th><th data-i18n="hand">Hand</th></tr></thead>
         <tbody id="imParts"></tbody>
       </table>
       <div class="row end gap">
-        <button class="btn" data-close>Cancel</button>
-        <button id="btnImportSave" class="btn primary">Save &amp; practise</button>
+        <button class="btn" data-close data-i18n="cancel">Cancel</button>
+        <button id="btnImportSave" class="btn primary" data-i18n="savePractise">Save &amp; practise</button>
       </div>
     </div>
   </div>
@@ -115,11 +106,11 @@
   <!-- Result -->
   <div class="modal" id="mResult">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mResultTitle">
-      <div class="sheet-head"><h2 id="mResultTitle">Well done!</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+      <div class="sheet-head"><h2 id="mResultTitle" data-i18n="wellDone">Well done!</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
       <div id="resBody"></div>
       <div class="row end gap">
-        <button id="btnResSongs" class="btn">Songs</button>
-        <button id="btnAgain" class="btn primary">&#8634; Play again</button>
+        <button id="btnResSongs" class="btn" data-i18n="songs">Songs</button>
+        <button id="btnAgain" class="btn primary">&#8634; <span data-i18n="playAgain">Play again</span></button>
       </div>
     </div>
   </div>
@@ -127,65 +118,67 @@
   <!-- Settings -->
   <div class="modal" id="mSettings">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mSettingsTitle">
-      <div class="sheet-head"><h2 id="mSettingsTitle">Settings</h2><button class="btn icon" data-close aria-label="Close">&#10005;</button></div>
+      <div class="sheet-head"><h2 id="mSettingsTitle" data-i18n="settings">Settings</h2><button class="btn icon" data-close aria-label="Close" data-i18n-aria="close">&#10005;</button></div>
       <section class="set-group">
-        <h3>Keyboard on the screen</h3>
-        <label class="field">Note names on the keys
+        <label class="field"><span>Language / Sprache</span>
+          <select id="setLang">
+            <option value="auto" data-i18n="langAuto">Automatic (device language)</option>
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="set-group">
+        <h3 data-i18n="grpKeyboard">Keyboard on the screen</h3>
+        <label class="field"><span data-i18n="keyNames">Note names on the keys</span>
           <select id="setLabels">
-            <option value="all">All white keys</option>
-            <option value="C">Only C keys (C3, C4&hellip;)</option>
-            <option value="off">Off</option>
+            <option value="all" data-i18n="namesAll">All white keys</option>
+            <option value="C" data-i18n="namesC">Only C keys (C3, C4&hellip;)</option>
+            <option value="off" data-i18n="namesOff">Off</option>
           </select>
         </label>
-        <label class="field">Size
+        <label class="field"><span data-i18n="size">Size</span>
           <select id="setRange">
-            <option value="fit">Fit to the song (bigger keys)</option>
-            <option value="full">All 88 keys</option>
+            <option value="fit" data-i18n="sizeFit">Fit to the song (bigger keys)</option>
+            <option value="full" data-i18n="sizeFull">All 88 keys</option>
           </select>
         </label>
       </section>
 
       <section class="set-group">
-        <h3>Falling notes view</h3>
-        <label class="check"><input type="checkbox" id="setLaneLabels"> Note names on the falling notes</label>
-        <p class="muted small">Switch between sheet music and falling notes with the &#9835; Sheet button.</p>
+        <h3 data-i18n="grpLane">Falling notes view</h3>
+        <label class="check"><input type="checkbox" id="setLaneLabels"> <span data-i18n="laneNames">Note names on the falling notes</span></label>
+        <p class="muted small" data-i18n="laneSwitch">Switch between sheet music and falling notes with the &#9835; Sheet button.</p>
       </section>
 
       <section class="set-group">
-        <h3>Listen</h3>
-        <label class="field">Speed
+        <h3 data-i18n="grpListen">Listen</h3>
+        <label class="field"><span data-i18n="speed">Speed</span>
           <select id="setListenSpeed">
-            <option value="1">Normal</option>
-            <option value="0.75">Slower (75%)</option>
-            <option value="0.5">Slow (50%)</option>
+            <option value="1" data-i18n="speedNormal">Normal</option>
+            <option value="0.75" data-i18n="speed75">Slower (75%)</option>
+            <option value="0.5" data-i18n="speed50">Slow (50%)</option>
           </select>
         </label>
-        <label class="check"><input type="checkbox" id="setListenOnPiano"> Play on the piano’s own sound when it is connected</label>
+        <label class="check"><input type="checkbox" id="setListenOnPiano"> <span data-i18n="listenPiano">Play on the piano’s own sound when it is connected</span></label>
       </section>
 
       <section class="set-group">
-        <h3>Without a piano</h3>
-        <label class="check"><input type="checkbox" id="setSound"> Sound when tapping the screen keys</label>
-        <p class="muted small">You can also play with a computer keyboard: A W S E D F T G Y H U J K = C to C, Z / X = octave down / up.</p>
+        <h3 data-i18n="grpNoPiano">Without a piano</h3>
+        <label class="check"><input type="checkbox" id="setSound"> <span data-i18n="tapSound">Sound when tapping the screen keys</span></label>
+        <p class="muted small" data-i18n="kbdHint">You can also play with a computer keyboard: A W S E D F T G Y H U J K = C to C, Z / X = octave down / up.</p>
       </section>
 
       <details class="help">
-        <summary>What the buttons do</summary>
-        <ul>
-          <li><b>Both / Right / Left</b> &ndash; practise both hands or one hand. The other hand’s notes are then not counted as mistakes.</li>
-          <li><b>&#8634; Restart</b> &ndash; start again from the beginning (or from the start of the loop).</li>
-          <li><b>&#9995; Fingers</b> &ndash; show or hide finger numbers (1 = thumb &hellip; 5 = little finger).</li>
-          <li><b>&#9835; Sheet</b> &ndash; sheet music (lit) or falling notes. Imported MIDI files always use falling notes.</li>
-          <li><b>&#9654;&#xFE0E; Listen</b> &ndash; hear the song from where you are; tap &#9632; to stop and play it yourself.</li>
-          <li><b>&#10227; Loop</b> &ndash; repeat a hard part: tap at its first note, move the slider (or play on) to its last note, tap <i>Set end</i>. Tap Loop again to stop.</li>
-          <li><b>Slider</b> &ndash; start from any point in the song.</li>
-          <li><b>&#9776; Songs</b> &ndash; choose, add, edit, share and back up songs.</li>
-        </ul>
+        <summary data-i18n="buttonsTitle">What the buttons do</summary>
+        <ul data-i18n-html="buttonsHtml"></ul>
       </details>
     </div>
   </div>
 
   <script src="vendor/vexflow/vexflow-bravura.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/notation.js"></script>
   <script src="js/midifile.js"></script>
   <script src="js/sheet.js"></script>

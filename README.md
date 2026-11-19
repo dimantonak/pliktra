@@ -50,6 +50,15 @@ and **restore** it later or on another device.
 - **⟳ Loop**: repeat a hard part. Tap Loop at its first step, move the slider (or play on) to its last step
   and tap *Set end*. Each round shows your wrong keys; tap Loop again to stop.
 
+## Languages
+
+English and German (Deutsch). Pliktra follows the device's language; change it in ⚙ Settings → *Language / Sprache*.
+In German, note names on the keys use German names (H for B, B for B♭, Fis, Es …).
+Songs are always typed with English letters (`B4`, `Bb4`; `H4` also works), so song links work in every language.
+
+To add a language, copy the `en` block in `js/i18n.js`, translate it and add it to `LANGS` and the Settings menu;
+`node --test tests/` checks that no text is missing.
+
 ## Install / offline
 
 On the website, use the browser's *Install app* or *Add to Home screen*. Pliktra then opens like an app
@@ -59,6 +68,7 @@ and also works without internet (the newest version is loaded whenever you are o
 
 - `index.html`, `styles.css` - page and layout
 - `js/app.js` - MIDI input, practice logic, drawing, song library/editor/import
+- `js/i18n.js` - texts in English and German, German note names
 - `js/notation.js` - note names, typed-song parser, grouping notes into steps
 - `js/midifile.js` - `.mid` file reader
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)

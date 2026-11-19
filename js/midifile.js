@@ -16,7 +16,7 @@ function parseMidiFile(buffer) {
   }
   function vlq() { var v = 0, b, guard = 0; do { b = d.getUint8(p++); v = (v * 128) + (b & 0x7f); } while ((b & 0x80) && ++guard < 4); return v; }
 
-  if (buffer.byteLength < 14 || str(4) !== 'MThd') throw new Error('This is not a MIDI file.');
+  if (buffer.byteLength < 14 || str(4) !== 'MThd') throw new Error(typeof t === 'function' ? t('notMidi') : 'This is not a MIDI file.');
   var hlen = u32();
   var format = u16(), ntrks = u16(), division = u16();
   p = 8 + hlen;
@@ -34,7 +34,7 @@ function parseMidiFile(buffer) {
       tick += vlq();
       var status = d.getUint8(p);
       if (status < 0x80) {
-        if (!running) throw new Error('The MIDI file looks damaged.');
+        if (!running) throw new Error(typeof t === 'function' ? t('midiDamaged') : 'The MIDI file looks damaged.');
         status = running;
       } else {
         p++;
