@@ -50,7 +50,7 @@ var I18N = {
     songHasMistakes: '“{t}” contains mistakes and can’t be added.',
     askAdd: 'Add {names} to your songs', askUpdate: 'Update {names} with the version in the {src}', askUpdateLower: 'update {names} with the version in the {src}',
     srcLink: 'link', srcBackup: 'backup', and: ' and ', backupSame: 'All songs in this backup are already here.',
-    sharedSong: 'Shared song', storageFull: 'This device’s storage for this app is full. Delete a long song and try again.',
+    quote: '“{t}”', sharedSong: 'Shared song', storageFull: 'This device’s storage for this app is full. Delete a long song and try again.',
     // editor
     editor: 'Song editor', title: 'Title', titlePh: 'e.g. Ode to Joy', notes: 'Notes',
     record: '● Record from piano', stopRecord: '■ Stop recording', clear: 'Clear', cancel: 'Cancel', savePractise: 'Save & practise',
@@ -137,7 +137,7 @@ var I18N = {
     songHasMistakes: '„{t}“ enthält Fehler und kann nicht hinzugefügt werden.',
     askAdd: '{names} zu deinen Stücken hinzufügen', askUpdate: '{names} mit der Version aus {src} aktualisieren', askUpdateLower: '{names} mit der Version aus {src} aktualisieren',
     srcLink: 'dem Link', srcBackup: 'der Sicherung', and: ' und ', backupSame: 'Alle Stücke aus dieser Sicherung sind schon da.',
-    sharedSong: 'Geteiltes Stück', storageFull: 'Der Speicher dieses Geräts für die App ist voll. Lösche ein langes Stück und versuche es nochmal.',
+    quote: '„{t}“', sharedSong: 'Geteiltes Stück', storageFull: 'Der Speicher dieses Geräts für die App ist voll. Lösche ein langes Stück und versuche es nochmal.',
     editor: 'Stück bearbeiten', title: 'Titel', titlePh: 'z. B. Ode an die Freude', notes: 'Noten',
     record: '● Vom Klavier aufnehmen', stopRecord: '■ Aufnahme stoppen', clear: 'Leeren', cancel: 'Abbrechen', savePractise: 'Speichern & üben',
     edInfo: '{n} Schritte · {hands}', moreErrors: '…und {n} weitere', addNotes: 'Füge zuerst Noten hinzu.', untitled: 'Stück ohne Titel',

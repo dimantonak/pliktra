@@ -878,7 +878,7 @@
 
   // Escape or a tap outside the dialog closes it (the editor asks first if something changed).
   function editorChanged() {
-    return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? editing.title : '');
+    return $('#edText').value !== (editing ? editing.text : '') || $('#edTitle').value.trim() !== (editing ? songName(editing) : '');
   }
   function dismissModal(id) {
     if (id === 'mEditor' && editorChanged() && !confirm(t('confirmCloseEditor'))) return;
@@ -980,7 +980,7 @@
     }
     prompt(t('copyLink'), url);
   }
-  function shareSong(song) { shareLink({ t: song.title, s: song.text }, songName(song), '“' + songName(song) + '”'); }
+  function shareSong(song) { shareLink({ t: song.title, s: song.text }, songName(song), t('quote', { t: songName(song) })); }
 
   // Song entries in links and backup files: typed {t, s}, MIDI {t, k: 'midi', n: [[m, t, d, h], ...]},
   // plus b = best scores {B, R, L} in backup files.
@@ -1030,7 +1030,7 @@
       else toAdd.push(item);
     }
     function names(arr) {
-      return arr.length > 4 ? t('nSongs', { n: arr.length }) : arr.map(function (x) { return '“' + songName(x.song || { title: x.title }) + '”'; }).join(', ');
+      return arr.length > 4 ? t('nSongs', { n: arr.length }) : arr.map(function (x) { return t('quote', { t: songName(x.song || { title: x.title }) }); }).join(', ');
     }
     function mergeBest(item) {   // keep the better score
       if (!item.d.b || !item.song) return;
@@ -1085,7 +1085,7 @@
     var typed = songs.filter(function (s) { return s.kind !== 'midi'; });
     if (!typed.length) { alert(t('noTypedSongs')); return; }
     shareLink(typed.map(function (s) { return songEntry(s, false); }), t('allSongsTitle'),
-      typed.length === 1 ? '“' + songName(typed[0]) + '”' : t('theseSongs', { n: typed.length }));
+      typed.length === 1 ? t('quote', { t: songName(typed[0]) }) : t('theseSongs', { n: typed.length }));
   };
   $('#btnBackup').onclick = function () {
     var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }) };
@@ -1102,7 +1102,9 @@
     f.text().then(function (txt) {
       var data = null;
       try { data = JSON.parse(txt); } catch (err) { /* handled below */ }
+      var playing = st.song, oldNotes = playing && playing.notes;
       importSongs(data && data.app === 'pliktra' ? data.songs : null, t('backupDamaged'), true);
+      if (playing && playing.notes !== oldNotes) loadSong(playing);   // the song being practised was updated
       renderLibrary();
     });
   });
@@ -1113,7 +1115,7 @@
 
   function openEditor(song) {
     editing = song || null;
-    $('#edTitle').value = song ? song.title : '';
+    $('#edTitle').value = song ? songName(song) : '';   // built-in songs: title in the user's language
     $('#edText').value = song ? song.text : '';
     $('#edError').textContent = '';
     setRecording(false);
@@ -1163,6 +1165,7 @@
     if (r.errors.length) return;
     if (!r.notes.length) { $('#edError').textContent = t('addNotes'); return; }
     var title = $('#edTitle').value.trim() || t('untitled');
+    if (editing && title === songName(editing)) title = editing.title;   // unchanged: keep the stored (English) title
     var song = editing;
     if (song) { song.title = title; song.text = $('#edText').value; song.notes = r.notes; }
     else { song = songFromText(title, $('#edText').value); songs.unshift(song); }
