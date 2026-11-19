@@ -37,7 +37,7 @@ var I18N = {
     // library
     newSong: '+ New song', importMidi: 'Import MIDI file',
     noSongs: 'No songs yet. Create one or import a MIDI file.',
-    metaSteps: '{n} steps', metaMidi: 'MIDI file', metaTyped: 'typed', metaBest: 'best {p}%',
+    metaSteps: '{n} steps', metaStep1: '1 step', metaMidi: 'MIDI file', metaTyped: 'typed', metaBest: 'best {p}%', metaBestHands: 'best: {list}', metaPct: '{p}%',
     practise: 'Practise', edit: 'Edit', rename: 'Rename', share: 'Share', del: 'Delete',
     songTitlePrompt: 'Song title', confirmDelete: 'Delete “{t}”?',
     backupNote: 'Your songs are saved in this browser only. Keep a backup, or share them all to another device.',
@@ -125,7 +125,7 @@ var I18N = {
     resFirst: 'Erster Wert gespeichert!', resNewBest: 'Neuer Bestwert! (vorher {p} %)', resBest: 'Dein Bestwert: {p} %',
     newSong: '+ Neues Stück', importMidi: 'MIDI-Datei importieren',
     noSongs: 'Noch keine Stücke. Lege eines an oder importiere eine MIDI-Datei.',
-    metaSteps: '{n} Schritte', metaMidi: 'MIDI-Datei', metaTyped: 'eingetippt', metaBest: 'Bestwert {p} %',
+    metaSteps: '{n} Schritte', metaStep1: '1 Schritt', metaMidi: 'MIDI-Datei', metaTyped: 'eingetippt', metaBest: 'Bestwert {p} %', metaBestHands: 'Bestwert: {list}', metaPct: '{p} %',
     practise: 'Üben', edit: 'Bearbeiten', rename: 'Umbenennen', share: 'Teilen', del: 'Löschen',
     songTitlePrompt: 'Titel des Stücks', confirmDelete: '„{t}“ löschen?',
     backupNote: 'Deine Stücke sind nur in diesem Browser gespeichert. Mach eine Sicherung oder teile alle mit einem anderen Gerät.',

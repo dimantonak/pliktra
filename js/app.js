@@ -915,6 +915,19 @@
     return e;
   }
 
+  // Best scores in the song list: "best 96%" when only both hands were practised, otherwise per hand
+  // ("best: both 96% · right 90%"), so practising one hand also shows progress.
+  function bestLabel(s) {
+    var parts = [];
+    [['B', 'both'], ['R', 'right'], ['L', 'left']].forEach(function (h) {
+      var p = best[s.id + ':' + h[0]];
+      if (p != null) parts.push({ h: h[0], txt: t(h[1]).toLowerCase() + ' ' + t('metaPct', { p: p }), p: p });
+    });
+    if (!parts.length) return '';
+    if (parts.length === 1 && parts[0].h === 'B') return ' · ' + t('metaBest', { p: parts[0].p });
+    return ' · ' + t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') });
+  }
+
   function renderLibrary() {
     var ul = $('#songList');
     ul.innerHTML = '';
@@ -923,9 +936,9 @@
       var li = el('li', st.song && st.song.id === s.id ? 'current' : '');
       var info = el('div', 'info');
       info.appendChild(el('div', 'name', songName(s)));
-      var b = best[s.id + ':B'];
-      var meta = t('metaSteps', { n: buildSteps(s.notes, 'B').length }) + ' · ' + handsLabel(s.notes) +
-        ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + (b != null ? ' · ' + t('metaBest', { p: b }) : '');
+      var nSteps = buildSteps(s.notes, 'B').length;
+      var meta = t(nSteps === 1 ? 'metaStep1' : 'metaSteps', { n: nSteps }) + ' · ' + handsLabel(s.notes) +
+        ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + bestLabel(s);
       info.appendChild(el('div', 'meta', meta));
       li.appendChild(info);
 
