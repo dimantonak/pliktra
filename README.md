@@ -78,6 +78,10 @@ and **restore** it later or on another device.
   own sound when it is connected, otherwise through the device. Speed can be lowered in Settings.
 - **⟳ Loop**: repeat a hard part. Tap Loop at its first step, move the slider (or play on) to its last step
   and tap *Set end*. Each round shows your wrong keys; tap Loop again to stop.
+- **Tempo (play along)**: choose 40, 60, 80 or 100% of the speed. Press any key for a one-bar count-in; then
+  the music runs on and doesn't wait. Every note counts as in time, a bit early or late, or missed; the result
+  shows a timing score, with a best score per speed. Optional metronome; when you practise one hand, the app
+  can play the other one. With a loop, each round shows its score. *Off (wait)* is the usual wait mode.
 
 ## Languages
 
@@ -104,6 +108,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
 - `js/drills.js` - note reading drills (generates the rounds)
 - `js/lessons.js` - the lessons (technique exercises) and their progress
+- `js/tempo.js` - play along: count-in clicks, timing of each key, score
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app
 - `tests/` - automated tests: `node --test tests/`

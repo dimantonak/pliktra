@@ -382,6 +382,24 @@ body {
   pointer-events: none;
 }
 .hint:empty { display: none; }
+.hint.count { font-size: 30px; font-weight: 800; padding: 2px 26px; }
+/* play along: the Tempo menu */
+.popover {
+  position: fixed;
+  z-index: 30;
+  width: min(360px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--panel, #1b1f27);
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.popover[hidden] { display: none; }
+.popover p { margin: 0; }
+.popover .seg { flex-wrap: wrap; }
 .hint.long { width: min(560px, calc(100% - 32px)); border-radius: 14px; font-size: 14.5px; line-height: 1.4; }
 .songlist .mark { display: inline-block; width: 1.1em; text-align: center; color: var(--muted); }
 .songlist .mark.done { color: var(--good); font-weight: 700; }

@@ -5,7 +5,7 @@
 var CACHE = 'pliktra';
 var FILES = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'js/app.js', 'js/i18n.js', 'js/notation.js', 'js/explain.js', 'js/drills.js', 'js/lessons.js', 'js/midifile.js', 'js/sheet.js',
+  'js/app.js', 'js/i18n.js', 'js/notation.js', 'js/explain.js', 'js/drills.js', 'js/lessons.js', 'js/tempo.js', 'js/midifile.js', 'js/sheet.js',
   'vendor/vexflow/vexflow-bravura.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'
 ];

@@ -79,7 +79,7 @@
 
   var savedSettings = store.get('pliktra.settings', {});
   var settings = Object.assign({ labels: 'all', laneLabels: true, range: 'fit', sound: true, fingers: true, view: 'sheet', reading: false,
-    listenSpeed: '1', listenOnPiano: true, lang: 'auto' }, savedSettings);
+    listenSpeed: '1', listenOnPiano: true, lang: 'auto', tempo: 0, metronome: false, otherHand: true }, savedSettings);
   if ((savedSettings.v || 1) < 2) {   // v2: sheet music and note names on all keys became the defaults
     settings.view = 'sheet';
     settings.labels = 'all';
@@ -148,6 +148,7 @@
 
   var demo = null;       // Listen playback in progress (see "Listen" below)
   var demoKeys = {};     // midi -> hand, keys sounding in the playback (lit on the keyboard)
+  var pa = null;         // play along in progress (see "Play along" below)
 
   function currentStep() { return (st.idx < st.steps.length) ? st.steps[st.idx] : null; }
   function targetT() {
@@ -175,6 +176,7 @@
 
   function restart(from) {
     endDemo();
+    endPlay();
     closeExplain();
     st.idx = Math.max(0, Math.min(from || 0, Math.max(0, st.steps.length - 1)));
     if (loopOn() && (st.idx < loop.a || st.idx > loop.b)) clearLoop();   // moved outside the loop
@@ -190,6 +192,7 @@
     if (!st.song || st.finished || demo) return;
     var step = currentStep();
     if (!step) return;
+    if (tempoOn()) { if (pa) playKey(m); else startPlay(); return; }   // play along: the first key starts the count-in
     if (step.notes.indexOf(m) >= 0) {
       if (!st.startTime) { st.startTime = performance.now(); requestWakeLock(); updateHint(); }
       st.hits[m] = true;
@@ -221,7 +224,7 @@
     st.idx++;
     st.hits = {}; st.stepMistake = false; st.rescue = false;
     if (loopOn() && st.idx > loop.b) {   // end of the loop: count the round and go again
-      loop.laps++; loop.lastMistakes = st.mistakes;
+      loop.laps++; loop.lastMistakes = st.mistakes; loop.lastScore = null;
       restart(loop.a);
       return;
     }
@@ -479,23 +482,30 @@
     if (!st.song) h = t('hintChoose');
     else if (!st.steps.length) h = t(st.hand === 'L' ? 'hintNoLeft' : st.hand === 'R' ? 'hintNoRight' : 'hintNoNotes');
     else if (demo) h = t('hintListening');
+    else if (pa) h = pa.flash || pa.count;   // count-in, then "early" / "late" now and then
     else if (loop.pending) h = t('hintLoop');
     else if (loopOn() && loop.laps && !st.startTime) {
-      var res = !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
+      var res = loop.lastScore != null ? t('roundTempo', { p: loop.lastScore }) : !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
       h = t('hintRound', { n: loop.laps, result: res });
     }
-    else if (!st.startTime && !st.finished) h = isLesson() ? t(Lessons.get(st.song.lesson).tip) : t(readingOn() ? 'hintRead' : 'hintStart');
+    else if (!st.startTime && !st.finished) {
+      h = tempoOn() ? t('hintTempo', { p: t('tempoPct', { p: Math.round(settings.tempo * 100) }) })
+        : isLesson() ? t(Lessons.get(st.song.lesson).tip) : t(readingOn() ? 'hintRead' : 'hintStart');
+    }
     $('#hint').textContent = h;
+    $('#hint').classList.toggle('count', !!(pa && !pa.flash && pa.count));
     $('#hint').classList.toggle('long', h.length > 70);
   }
 
-  function showResult() {
+  // r: the result of playing along (see finishPlay); without it, the wait-mode result.
+  // Play-along best scores are kept per speed ("<id>:<hand>@60").
+  function showResult(r) {
     if (!st.finished || !st.song) return;
     var total = st.steps.length - st.startIdx;
-    var acc = total ? Math.round(100 * st.clean / total) : 0;
+    var acc = r ? Tempo.score(r) : total ? Math.round(100 * st.clean / total) : 0;
     var secs = Math.round((performance.now() - st.startTime) / 1000);
     var full = st.startIdx === 0;
-    var key = st.song.id + ':' + st.hand;
+    var key = st.song.id + ':' + st.hand + (r ? '@' + Math.round(r.speed * 100) : '');
     var prev = best[key];
     var isBest = full && (prev == null || acc > prev);
     if (isBest) { best[key] = acc; store.set('pliktra.best', best); }
@@ -503,15 +513,16 @@
     var note = !full ? t('resPartial', { n: st.startIdx + 1 })
       : isBest ? (prev == null ? t('resFirst') : t('resNewBest', { p: prev }))
       : t('resBest', { p: prev });
+    var line = function (k, v) { return '<span>' + t(k) + '</span><b>' + v + '</b>'; };
+    var lines = r
+      ? line('resHands', handName) + line('resTempo', tempoLabel(r.speed)) + line('resNotes', r.total) + line('resInTime', r.ok) +
+        line('resEarly', r.early) + line('resLate', r.late) + line('resMissed', r.missed) + line('resWrong', r.wrong)
+      : line('resHands', handName) + line('resSteps', total) + line('resWrong', st.mistakes) +
+        line('resTime', Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2));
     $('#resBody').innerHTML =
       '<div class="result-big">' + acc + '%</div>' +
-      '<div class="result-sub">' + t('resultSub') + '</div>' +
-      '<div class="result-lines">' +
-        '<span>' + t('resHands') + '</span><b>' + handName + '</b>' +
-        '<span>' + t('resSteps') + '</span><b>' + total + '</b>' +
-        '<span>' + t('resWrong') + '</span><b>' + st.mistakes + '</b>' +
-        '<span>' + t('resTime') + '</span><b>' + Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2) + '</b>' +
-      '</div>' +
+      '<div class="result-sub">' + t(r ? 'tempoSub' : 'resultSub') + '</div>' +
+      '<div class="result-lines">' + lines + '</div>' +
       '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>';
     var watch = drillWatch();
     if (isDrill()) {
@@ -519,7 +530,7 @@
       $('#resBody').appendChild(wl);
     }
     var nextLesson = isLesson() && Lessons.next(st.song.lesson);
-    if (isLesson()) {
+    if (isLesson() && !r) {   // lessons are ticked off in wait mode
       var ls = Lessons.get(st.song.lesson), done = Lessons.status(ls, best) === 'done';
       $('#resBody').appendChild(el('div', 'result-note' + (done ? ' best' : ''), done ? t('lessonDoneNote')
         : t(st.hand !== 'B' && Lessons.hands(ls) === 'B' ? 'lessonAimBoth' : 'lessonAim', { p: Lessons.DONE })));
@@ -754,7 +765,21 @@
         } catch (e) { /* already stopped */ }
       });
     }
-    return { on: on, off: off, play: play, stopAll: stopAll };
+    // Metronome click after `delay` s (accent: the first beat of a bar). Returns a handle for stopAll.
+    function click(delay, accent) {
+      var a = ctx();
+      if (!a) return null;
+      var t = a.currentTime + Math.max(0, delay);
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = 'square'; o.frequency.value = accent ? 1760 : 1175;
+      o.connect(g); g.connect(a.destination);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(accent ? 0.16 : 0.1, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.start(t); o.stop(t + 0.08);
+      return { o: o, o2: { stop: function () {} }, g: g };
+    }
+    return { on: on, off: off, play: play, stopAll: stopAll, click: click };
   })();
 
   // ---------------------------------------------------------------- Listen (demo playback)
@@ -833,6 +858,13 @@
     var d = demo;
     if (!d) return;
     demo = null;
+    silence(d);
+    showListenToggle();
+    updateHint();
+    dirty = true;
+  }
+  // Stops what a playback (Listen or play along) has scheduled: timers, piano notes, synth sounds.
+  function silence(d) {
     clearInterval(d.timer);
     d.timers.forEach(clearTimeout);
     demoKeys = {};
@@ -849,9 +881,6 @@
       setTimeout(allOff, 300);   // notes already queued ahead
     }
     synth.stopAll(d.nodes);
-    showListenToggle();
-    updateHint();
-    dirty = true;
   }
 
   // Stops the playback and goes back to where it started, ready to play.
@@ -861,6 +890,193 @@
     endDemo();
     restart(d.from);
   }
+
+  // ---------------------------------------------------------------- Play along (tempo)
+  // With a tempo chosen, the first key starts a count-in, then the music runs at that speed and
+  // doesn't wait. Every note of the practised hand is judged in time / early / late / missed
+  // (rules in js/tempo.js). Practising one hand, the app can play the other one (as Listen does).
+  function tempoOn() { return settings.tempo > 0; }
+  function paMs(t) { return pa.startMs + (t - pa.tc) / pa.speed * 1000; }      // song time -> performance.now()
+  function paT(now) { return pa.tc + (now - pa.startMs) / 1000 * pa.speed; }   // performance.now() -> song time
+  function tempoLabel(speed) {
+    var s = t('tempoPct', { p: Math.round(speed * 100) });
+    return st.song && st.song.kind === 'text' ? s + ' · ' + t('tempoBpm', { n: Tempo.bpm(speed) }) : s;
+  }
+
+  function startPlay() {
+    if (!st.song || !st.steps.length || st.idx >= st.steps.length) return;
+    var from = st.idx, to = loopOn() && from <= loop.b ? loop.b : st.steps.length - 1;
+    var t0 = st.steps[from].t, t1 = st.steps[to].t + CHORD_TOLERANCE;
+    var inRange = function (n) { return n.t >= t0 - 0.001 && n.t <= t1; };
+    var targets = [], byKey = {}, stepT = {};
+    st.song.notes.forEach(function (n) {
+      if (!inRange(n) || (st.hand !== 'B' && n.h !== st.hand)) return;
+      var k = n.m + ':' + n.t;
+      if (byKey[k]) return;   // the same key twice at once (both hands): played once
+      targets.push(byKey[k] = { m: n.m, t: n.t, h: n.h, res: null });
+    });
+    var si = from;   // each target belongs to the last step at or before it
+    targets.forEach(function (n) {
+      while (si < to && st.steps[si + 1].t <= n.t + 1e-6) si++;
+      (stepT[si] = stepT[si] || []).push(n);
+    });
+    var other = st.hand !== 'B' && settings.otherHand
+      ? playbackNotes(st.song.notes.filter(function (n) { return inRange(n) && n.h !== st.hand; })) : [];
+    var info = st.song.kind === 'text' ? parseSongText(st.song.text) : null;
+    var clicks = Tempo.clicks(info, t0, t1, settings.metronome), num = 0;
+    clicks.forEach(function (c) { num = c.accent ? 1 : num + 1; c.num = num; });
+    pa = { from: from, to: to, t0: t0, t1: t1, speed: settings.tempo, targets: targets, byKey: byKey, stepT: stepT,
+      ji: 0, si: from, other: other, oi: 0, clicks: clicks, ci: 0, count: '', flash: '',
+      tc: clicks.length ? clicks[0].t : t0, startMs: performance.now() + 150,
+      ok: 0, early: 0, late: 0, missed: 0, wrong: 0,
+      out: other.length ? demoOutput() : null, nodes: [], timers: [], sent: {}, seq: 0, owner: {}, timer: 0 };
+    st.startTime = performance.now();
+    requestWakeLock();
+    pa.timer = setInterval(playTick, 25);
+    playTick();
+    updateHint();
+  }
+
+  function playTick() {
+    var p = pa;
+    if (!p) return;
+    var now = performance.now(), T = paT(now);
+    // metronome and the other hand, scheduled 200 ms ahead
+    while (p.ci < p.clicks.length && paMs(p.clicks[p.ci].t) <= now + 200) {
+      var c = p.clicks[p.ci++], at = paMs(c.t);
+      p.nodes.push(synth.click((at - now) / 1000, c.accent));
+      if (c.countIn) p.timers.push(setTimeout(function (num) { if (pa === p) { p.count = String(num); updateHint(); } }.bind(null, c.num), Math.max(0, at - now)));
+    }
+    while (p.oi < p.other.length && paMs(p.other[p.oi].t) <= now + 200) {
+      var n = p.other[p.oi++], on = paMs(n.t), off = on + Math.max(60, n.d / p.speed * 1000);
+      if (n.next != null) off = Math.min(off, paMs(n.next) - 2);   // never into the same key's next note
+      demoNote(p, n, on, Math.max(on + 1, off));
+    }
+    if (p.count && T >= p.t0 - 0.001) { p.count = ''; updateHint(); }   // the music has started
+    // notes that can no longer be played in time
+    var changed = false;
+    while (p.ji < p.targets.length && (T - p.targets[p.ji].t) / p.speed > Tempo.WINDOW) {
+      var x = p.targets[p.ji++];
+      if (!x.res) { x.res = 'miss'; p.missed++; changed = true; if (isDrill()) st.missed[x.m] = x.h; }
+    }
+    // the step to play now: the first one with notes still to play
+    var si = p.si;
+    while (si <= p.to && (p.stepT[si] || []).every(function (y) { return y.res; })) si++;
+    if (si !== p.si) {
+      p.si = si;
+      st.idx = Math.min(si, p.to);
+      st.hits = {};
+      if (si <= p.to) p.stepT[si].forEach(function (y) { if (y.res && y.res !== 'miss') st.hits[y.m] = true; });
+      changed = true;
+    }
+    if (changed) { st.mistakes = p.missed + p.wrong; updateStats(); dirty = true; }
+    if (si > p.to && now > paMs(p.t1) + 400) finishPlay();
+  }
+
+  function playKey(m) {
+    var p = pa, now = performance.now(), T = paT(now);
+    var j = Tempo.judge(p.targets, m, T, p.speed);
+    if (j) {
+      j.target.res = j.grade;
+      p[j.grade]++;
+      if ((p.stepT[p.si] || []).indexOf(j.target) >= 0) st.hits[m] = true;
+      if (j.grade !== 'ok') {   // "early" / "late" for a moment
+        p.flash = t(j.grade === 'early' ? 'tempoEarly' : 'tempoLate');
+        p.timers.push(setTimeout(function () { if (pa === p) { p.flash = ''; updateHint(); } }, 700));
+        updateHint();
+      }
+      playTick();
+    } else if (otherHandNote(m, currentStep())) {
+      // One-hand practice: playing the other hand's part along with it is not a mistake.
+    } else if (T >= p.t0 - Tempo.WINDOW * p.speed) {   // (keys during the count-in don't count)
+      wrong[m] = now;
+      p.wrong++;
+      st.mistakes = p.missed + p.wrong;
+      if (readingOn()) st.rescue = true;
+      var step = currentStep();
+      if (isDrill() && step) step.notes.forEach(function (k) { st.missed[k] = step.hands[k]; });
+      updateStats();
+    }
+    dirty = true;
+  }
+
+  function finishPlay() {
+    var p = pa;
+    if (!p) return;
+    endPlay();
+    var r = { ok: p.ok, early: p.early, late: p.late, missed: p.missed, wrong: p.wrong, total: p.targets.length, speed: p.speed };
+    if (loopOn()) {   // end of the loop: count the round, then the next key starts it again
+      loop.laps++; loop.lastScore = Tempo.score(r);
+      restart(loop.a);
+      return;
+    }
+    st.idx = p.to + 1;
+    st.hits = {};
+    st.finished = true;
+    updateStats();
+    setTimeout(function () { showResult(r); }, 350);
+  }
+
+  // Stops playing along (keeps the position and the counts).
+  function endPlay() {
+    var p = pa;
+    if (!p) return;
+    pa = null;
+    silence(p);
+    updateHint();
+    dirty = true;
+  }
+  // Stops playing along and goes back to where it started.
+  function abortPlay() { if (pa) restart(pa.from); }
+
+  // The Tempo button opens a small menu: off (wait) or a speed, metronome, the other hand.
+  function showTempoToggle() {
+    var b = $('#btnTempo');
+    b.classList.toggle('on', tempoOn());
+    b.querySelector('.lbl').textContent = tempoOn() ? t('tempoPct', { p: Math.round(settings.tempo * 100) }) : t('tempo');
+  }
+  function fillTempoMenu() {
+    var seg = $('#tempoSeg');
+    seg.innerHTML = '';
+    [0].concat(Tempo.SPEEDS).forEach(function (sp) {
+      var b = el('button', sp === settings.tempo ? 'on' : '', sp ? t('tempoPct', { p: Math.round(sp * 100) }) : t('tempoOff'));
+      b.type = 'button';
+      b.onclick = function () {
+        settings.tempo = sp;
+        store.set('pliktra.settings', settings);
+        abortPlay();
+        fillTempoMenu(); showTempoToggle(); updateHint();
+      };
+      seg.appendChild(b);
+    });
+    $('#tempoBpm').textContent = tempoOn() ? tempoLabel(settings.tempo) : t('tempoWait');
+    $('#setMetronome').checked = !!settings.metronome;
+    $('#setOtherHand').checked = !!settings.otherHand;
+  }
+  function closeTempoMenu() { $('#tempoMenu').hidden = true; $('#btnTempo').setAttribute('aria-expanded', 'false'); }
+  $('#btnTempo').onclick = function () {
+    var menu = $('#tempoMenu');
+    if (!menu.hidden) { closeTempoMenu(); return; }
+    fillTempoMenu();
+    menu.hidden = false;
+    $('#btnTempo').setAttribute('aria-expanded', 'true');
+    var r = $('#btnTempo').getBoundingClientRect();
+    menu.style.top = Math.round(r.bottom + 6) + 'px';
+    menu.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))) + 'px';
+  };
+  ['setMetronome', 'setOtherHand'].forEach(function (id) {
+    $('#' + id).addEventListener('change', function () {
+      settings[id === 'setMetronome' ? 'metronome' : 'otherHand'] = $('#' + id).checked;
+      store.set('pliktra.settings', settings);
+      abortPlay();
+    });
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if ($('#tempoMenu').hidden || $('#tempoMenu').contains(e.target) || $('#btnTempo').contains(e.target)) return;
+    closeTempoMenu();
+  }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#tempoMenu').hidden) closeTempoMenu(); });
+  showTempoToggle();
 
   // ---------------------------------------------------------------- canvas: layout
   var cv = $('#stage'), ctx = cv.getContext('2d');
@@ -954,18 +1170,20 @@
       ctx.beginPath(); ctx.rect(0, 0, W, laneH); ctx.clip();
       ctx.font = '600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      for (var k = firstNoteAtOrAfter(notes, step.t - 0.001); k < notes.length; k++) {
+      var fromT = pa ? Math.min(step.t, st.viewT - 1) : step.t;   // playing along: notes pass the keyboard line
+      for (var k = firstNoteAtOrAfter(notes, fromT - 0.001); k < notes.length; k++) {
         var n = notes[k];
         if (n.t > maxT) break;
         if (n.m < geo.lo || n.m > geo.hi) continue;
         var active = st.hand === 'B' || n.h === st.hand;
-        var isCur = active && n.t < step.t + 0.046 && step.notes.indexOf(n.m) >= 0;
-        var done = isCur && st.hits[n.m];
+        var isCur = active && n.t < step.t + 0.046 && n.t > step.t - 0.046 && step.notes.indexOf(n.m) >= 0;
+        var judged = pa && active && pa.byKey[n.m + ':' + n.t];
+        var done = judged && judged.res ? judged.res !== 'miss' : isCur && st.hits[n.m];
         var r = keyRect(n.m);
         var yb = laneH - (n.t - st.viewT) * pps;
         var showFinger = settings.fingers && active && n.f;
         var h = Math.max(n.d * pps - 3, showFinger ? 26 : 15);
-        ctx.globalAlpha = !active ? 0.25 : done ? 0.34 : 1;
+        ctx.globalAlpha = !active ? 0.25 : done ? 0.34 : judged && judged.res === 'miss' ? 0.18 : 1;
         if (active) {
           var ng = ctx.createLinearGradient(0, yb - h, 0, yb);
           ng.addColorStop(0, HAND_COLOR[n.h]);
@@ -1180,7 +1398,8 @@
     var dt = Math.min(0.05, (now - lastFrame) / 1000);
     lastFrame = now;
     var tgt = targetT();
-    if (st.viewT !== tgt) {
+    if (pa) { st.viewT = paT(performance.now()); dirty = true; }   // playing along: the notes move at the tempo (same clock as the judging)
+    else if (st.viewT !== tgt) {
       st.viewT += (tgt - st.viewT) * Math.min(1, dt * 12);
       if (Math.abs(tgt - st.viewT) < 0.0005) st.viewT = tgt;
       dirty = true;
@@ -1258,7 +1477,7 @@
   });
 
   // ---------------------------------------------------------------- modals
-  function openModal(id) { stopDemo(); closeExplain(); $('#' + id).classList.add('open'); dirty = true; }
+  function openModal(id) { stopDemo(); abortPlay(); closeTempoMenu(); closeExplain(); $('#' + id).classList.add('open'); dirty = true; }
   function closeModal(id) {
     $('#' + id).classList.remove('open');
     if (id === 'mEditor') setRecording(false);
@@ -1452,7 +1671,7 @@
     if (!confirm(t('confirmDelete', { t: songName(s) }))) return;
     songs = songs.filter(function (x) { return x !== s; });
     saveSongs();
-    ['B', 'R', 'L'].forEach(function (h) { delete best[s.id + ':' + h]; });
+    Object.keys(best).forEach(function (k) { if (k.indexOf(s.id + ':') === 0) delete best[k]; });
     store.set('pliktra.best', best);
     closeModal('mSong');
     if (st.song === s) loadSong(null);
@@ -1489,7 +1708,7 @@
   function shareSong(song) { shareLink(songEntry(song, false), songName(song), t('quote', { t: songName(song) })); }
 
   // Song entries in links and backup files: typed {t, s}, MIDI {t, k: 'midi', n: [[m, t, d, h], ...]},
-  // plus g = group name (optional) and b = best scores {B, R, L} in backup files.
+  // plus g = group name (optional) and b = best scores {B, R, L, and per play-along speed "B@60"} in backup files.
   function songEntry(s, withBest) {
     var e = s.kind === 'midi'
       ? { t: s.title, k: 'midi', n: s.notes.map(function (n) { return [n.m, n.t, n.d, n.h]; }) }
@@ -1497,7 +1716,7 @@
     if (s.group) e.g = s.group;
     if (withBest) {
       var b = {};
-      ['B', 'R', 'L'].forEach(function (h) { if (best[s.id + ':' + h] != null) b[h] = best[s.id + ':' + h]; });
+      Object.keys(best).forEach(function (k) { if (k.indexOf(s.id + ':') === 0) b[k.slice(s.id.length + 1)] = best[k]; });   // B, R, L, B@60, ...
       if (Object.keys(b).length) e.b = b;
     }
     return e;
@@ -1541,7 +1760,7 @@
     }
     function mergeBest(item) {   // keep the better score
       if (!item.d.b || !item.song) return;
-      ['B', 'R', 'L'].forEach(function (h) {
+      Object.keys(item.d.b).filter(function (h) { return /^[BRL](@\d{1,3})?$/.test(h); }).forEach(function (h) {
         var v = item.d.b[h], k = item.song.id + ':' + h;
         if (typeof v === 'number' && v >= 0 && v <= 100 && (best[k] == null || v > best[k])) best[k] = v;
       });
@@ -1809,6 +2028,7 @@
   // Loop: 1st tap = start here, 2nd tap = end here (after moving the slider or playing on), 3rd tap = off.
   $('#btnLoop').onclick = function () {
     if (!st.steps.length) return;
+    if (pa) restart(Math.min(st.idx, st.steps.length - 1));   // stop playing along, stay here
     if (loopOn()) { stopDemo(); clearLoop(); updateStats(); updateHint(); return; }
     var here = Math.min(st.idx, st.steps.length - 1);
     if (!loop.pending) { endDemo(); loop.pending = true; loop.a = here; showLoopToggle(); updateHint(); return; }
@@ -1896,7 +2116,7 @@
   function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock = null; } }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && st.startTime && !st.finished) requestWakeLock();
-    if (document.visibilityState === 'hidden') { releaseMidiNotes(); stopDemo(); }
+    if (document.visibilityState === 'hidden') { releaseMidiNotes(); stopDemo(); abortPlay(); }
   });
   // Let the screen sleep again after 3 minutes without playing.
   setInterval(function () {
