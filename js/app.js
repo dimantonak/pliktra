@@ -949,9 +949,11 @@
     box.appendChild(songListEl(own));
     var det = el('details', 'starters');
     det.open = startersOpen != null ? startersOpen : !!(st.song && isStarter(st.song));
-    det.appendChild(el('summary', '', t('starterSongs', { n: starters.length })));
+    var sum = el('summary', '', t('starterSongs', { n: starters.length }));
+    // Only the user's own tap counts (setting det.open above also fires a "toggle" event, later).
+    sum.addEventListener('click', function () { startersOpen = !det.open; });
+    det.appendChild(sum);
     det.appendChild(songListEl(starters));
-    det.addEventListener('toggle', function () { startersOpen = det.open; });
     box.appendChild(det);
   }
 
