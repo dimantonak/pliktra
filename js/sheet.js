@@ -14,7 +14,9 @@ var Sheet = (function () {
   ];
 
   function available() { return typeof Vex !== 'undefined' && !!(Vex.Flow && Vex.Flow.Renderer); }
-  function snap(b) { return Math.round(b * 32) / 32; }
+  // Positions snap to the shortest written value (a 32nd note = 1/8 beat), so every gap and
+  // length can be written exactly and each bar adds up. Triplets come out as 16th/dotted 16th.
+  function snap(b) { return Math.round(b * 8) / 8; }
   function beatKey(b) { return snap(b).toFixed(4); }
 
   // Splits a length into note values that can be written (e.g. 2.5 -> half + eighth, tied).
@@ -93,6 +95,7 @@ var Sheet = (function () {
     if (it.rest) {
       var rk = it.whole ? (clef === 'treble' ? 'd/5' : 'f/3') : (clef === 'treble' ? 'b/4' : 'd/3');
       var rn = new VF.StaveNote({ clef: clef, keys: [rk], duration: it.dur + 'r', align_center: !!it.whole });
+      if (it.whole) rn.setIntrinsicTicks(it.len * VF.RESOLUTION / 4);   // whole-bar rest lasts one bar (e.g. 3 beats in 3/4)
       if (it.dotted) VF.Dot.buildAndAttach([rn], { all: true });
       return rn;
     }
@@ -104,24 +107,29 @@ var Sheet = (function () {
 
   // Finger numbers as in printed music: right hand above the treble staff, left hand below
   // the bass staff, stacked for chords (top number = top note).
+  // Returns the vertical extent used [top, bottom] so the score can grow to fit.
   function drawFingers(ctx, note, it, hand, stave) {
     var fingers = it.notes.slice().sort(function (a, b) { return a.m - b.m; })
       .map(function (n) { return n.f ? String(n.f) : ''; });
-    if (!fingers.some(Boolean)) return;
+    if (!fingers.some(Boolean)) return null;
     var bb = note.getBoundingBox();
     var x = (note.getNoteHeadBeginX() + note.getNoteHeadEndX()) / 2;
     var LINE = 12;
     ctx.save();
     ctx.setFont('Arial, sans-serif', 12, 'bold');
     ctx.setFillStyle('#2a2f38');
+    var n = fingers.length, ext;
     if (hand === 'R') {
       var top = Math.min(bb.getY(), stave.getYForLine(0)) - 6;
       fingers.forEach(function (f, i) { if (f) ctx.fillText(f, x - 3.5, top - i * LINE); });          // low -> high upward
+      ext = [top - (n - 1) * LINE - LINE, top];
     } else {
       var bottom = Math.max(bb.getY() + bb.getH(), stave.getYForLine(4)) + 16;
       fingers.slice().reverse().forEach(function (f, i) { if (f) ctx.fillText(f, x - 3.5, bottom + i * LINE); }); // high -> low downward
+      ext = [bottom - LINE, bottom + (n - 1) * LINE + 3];
     }
     ctx.restore();
+    return ext;
   }
 
   // Draws the whole song as one long grand staff into `container`.
@@ -142,7 +150,7 @@ var Sheet = (function () {
     var ctx = renderer.getContext();
     ctx.scale(s, s);
 
-    var marks = {}, pending = [], x = 15, last = lay.bars.length - 1;
+    var marks = {}, pending = [], x = 15, last = lay.bars.length - 1, minY = 0, maxY = H;
     lay.bars.forEach(function (bar, i) {
       var w = widths[i];
       var sT = new VF.Stave(x, YT, w), sB = new VF.Stave(x, YB, w);
@@ -185,16 +193,33 @@ var Sheet = (function () {
       var fmt = new VF.Formatter();
       voices.forEach(function (v) { fmt.joinVoices([v.voice]); });
       fmt.format(voices.map(function (v) { return v.voice; }), x + w - startX - 14);
-      voices.forEach(function (v) { v.voice.draw(ctx, v.stave); });
+      voices.forEach(function (v) {
+        v.voice.draw(ctx, v.stave);
+        v.voice.getTickables().forEach(function (t) {   // very high / low notes and their stems
+          var b = t.getBoundingBox && t.getBoundingBox();
+          if (b) { minY = Math.min(minY, b.getY()); maxY = Math.max(maxY, b.getY() + b.getH()); }
+        });
+      });
       extras.forEach(function (e) { e.setContext(ctx).draw(); });
-      fingerJobs.forEach(function (j) { drawFingers(ctx, j.note, j.it, j.hand, j.stave); });
+      fingerJobs.forEach(function (j) {
+        var e = drawFingers(ctx, j.note, j.it, j.hand, j.stave);
+        if (e) { minY = Math.min(minY, e[0]); maxY = Math.max(maxY, e[1]); }
+      });
       x += w;
     });
+
+    // Grow the drawing up/down if anything sticks out (high notes, stacked finger numbers).
+    var top = Math.min(0, Math.floor(minY) - 6), bot = Math.max(H, Math.ceil(maxY) + 6);
+    if (top < 0 || bot > H) {
+      var svg = container.querySelector('svg'), hPx = Math.ceil((bot - top) * s);
+      svg.setAttribute('height', hPx); svg.style.height = hPx + 'px';
+      ctx.setViewBox(0, top, Math.ceil(total * s) / s, (bot - top));
+    }
 
     pending.forEach(function (p) {
       (marks[p.key] = marks[p.key] || []).push({ hand: p.hand, x: p.note.getAbsoluteX() * s, el: p.note.getSVGElement() });
     });
-    return { width: total * s, height: H * s, marks: marks };
+    return { width: total * s, height: (bot - top) * s, marks: marks };
   }
 
   return { available: available, render: render, beatKey: beatKey, layoutBars: layoutBars };

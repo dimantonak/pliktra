@@ -46,7 +46,8 @@ function parseSongText(text) {
       if (!tok) continue;
       var dur = 1, body = tok, u = tok.indexOf('_');
       if (u >= 0) {
-        dur = parseFloat(tok.slice(u + 1));
+        var ds = tok.slice(u + 1);
+        dur = /^(\d+\.?\d*|\.\d+)$/.test(ds) ? parseFloat(ds) : NaN;   // "2", "0.5", ".5"; not "2abc"
         body = tok.slice(0, u);
         if (!(dur > 0)) { errors.push('"' + tok + '": the length after _ must be a number'); continue; }
       }
@@ -69,6 +70,8 @@ function parseSongText(text) {
         }
         var m = parseNoteName(name);
         if (m == null) { errors.push('"' + parts[pi] + '" is not a note on the piano'); bad = true; break; }
+        var dup = stepNotes.filter(function (x) { return x.m === m; })[0];   // same key twice in a chord
+        if (dup) { if (!dup.f) dup.f = finger; continue; }
         stepNotes.push({ m: m, h: hm ? hm[1].toUpperCase() : (m >= 60 ? 'R' : 'L'), s: spelled(name), f: finger });
       }
       if (bad) continue;

@@ -8,6 +8,12 @@ function parseMidiFile(buffer) {
   function u16() { var v = d.getUint16(p); p += 2; return v; }
   function u32() { var v = d.getUint32(p); p += 4; return v; }
   function str(n) { var s = ''; for (var i = 0; i < n; i++) s += String.fromCharCode(d.getUint8(p + i)); p += n; return s; }
+  // Track names: UTF-8 if valid, otherwise Latin-1 (older files)
+  function text(at, n) {
+    var bytes = new Uint8Array(d.buffer, d.byteOffset + at, Math.max(0, Math.min(n, d.byteLength - at)));
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch (e) { var r = ''; for (var i = 0; i < bytes.length; i++) r += String.fromCharCode(bytes[i]); return r; }
+  }
   function vlq() { var v = 0, b, guard = 0; do { b = d.getUint8(p++); v = (v * 128) + (b & 0x7f); } while ((b & 0x80) && ++guard < 4); return v; }
 
   if (buffer.byteLength < 14 || str(4) !== 'MThd') throw new Error('This is not a MIDI file.');
@@ -15,7 +21,7 @@ function parseMidiFile(buffer) {
   var format = u16(), ntrks = u16(), division = u16();
   p = 8 + hlen;
 
-  var tempos = [], raw = [], trackNames = [], trackChannels = [];
+  var tempos = [], raw = [], trackNames = [], trackChannels = [], truncated = false;
 
   for (var tr = 0; tr < ntrks && p + 8 <= d.byteLength; tr++) {
     var id = str(4), len = u32();
@@ -23,6 +29,7 @@ function parseMidiFile(buffer) {
     if (id !== 'MTrk') break;
     var end = Math.min(p + len, d.byteLength), tick = 0, running = 0, open = {};
     trackChannels[tr] = {};
+    try {
     while (p < end) {
       tick += vlq();
       var status = d.getUint8(p);
@@ -38,8 +45,7 @@ function parseMidiFile(buffer) {
         if (type === 0x51 && mlen >= 3) {
           tempos.push({ tick: tick, us: (d.getUint8(p) << 16) | (d.getUint8(p + 1) << 8) | d.getUint8(p + 2) });
         } else if ((type === 0x03) && !trackNames[tr]) {
-          var nm = ''; for (var i = 0; i < mlen; i++) nm += String.fromCharCode(d.getUint8(p + i));
-          trackNames[tr] = nm.trim();
+          trackNames[tr] = text(p, mlen).trim();
         }
         p += mlen;
       } else if (status === 0xF0 || status === 0xF7) {
@@ -60,12 +66,17 @@ function parseMidiFile(buffer) {
         }
       }
     }
+    } catch (err) {   // file cut short: keep the notes read so far
+      if (!(err instanceof RangeError)) throw err;
+      truncated = true;
+    }
     for (var k in open) { // notes never released: end them at the end of the track
       for (var j = 0; j < open[k].length; j++) {
         raw.push({ track: tr, ch: Math.floor(k / 128), m: k % 128, on: open[k][j].tick, off: tick, v: open[k][j].vel });
       }
     }
     p = end;
+    if (truncated) break;
   }
 
   // ---- ticks -> seconds

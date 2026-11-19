@@ -145,6 +145,7 @@ body {
   font-size: 19px;
   pointer-events: none;
 }
+.hint.on-paper { color: #4a5260; }
 
 /* ---- modals */
 .modal {

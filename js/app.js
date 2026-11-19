@@ -176,6 +176,7 @@
     var sheetLib = typeof Sheet !== 'undefined' && Sheet.available();
     box.hidden = !sheetOn();
     $('#hint').style.top = sheetOn() && geo ? (geo.kbTop - 36) + 'px' : '';
+    $('#hint').classList.toggle('on-paper', sheetOn());   // dark text on the light score
     dirty = true;
     if (!sheetOn() || !geo) return;
     box.style.height = geo.kbTop + 'px';
@@ -189,6 +190,11 @@
       if (key !== sheetState.key) {
         try {
           sheetState.data = Sheet.render($('#sheetSvg'), st.song.text, { fingers: settings.fingers, scale: scale });
+          var room = geo.kbTop - 8;   // grew taller (very high/low notes)? draw it a bit smaller
+          if (sheetState.data.height > room && scale > 0.5) {
+            sheetState.data = Sheet.render($('#sheetSvg'), st.song.text,
+              { fingers: settings.fingers, scale: Math.max(0.5, scale * room / sheetState.data.height) });
+          }
           sheetState.key = key;
         } catch (e) {
           if (window.console) console.error(e);
@@ -285,7 +291,7 @@
 
   function noteOn(m, src) {
     held[m] = (held[m] || 0) + 1;
-    if (src === 'midi') midiHeld[m] = true;
+    if (src === 'midi') midiHeld[m] = (midiHeld[m] || 0) + 1;   // counted, like held[]
     lastNoteAt = performance.now();
     if (st.startTime && !st.finished) requestWakeLock();
     if (src !== 'midi' && settings.sound) synth.on(m);
@@ -298,7 +304,7 @@
   function noteOff(m, src) {
     if (src === 'midi') {
       if (!midiHeld[m]) return;   // already released (e.g. after the piano was unplugged)
-      delete midiHeld[m];
+      if (--midiHeld[m] <= 0) delete midiHeld[m];
     }
     var c = (held[m] || 0) - 1;
     if (c > 0) held[m] = c; else delete held[m];
@@ -348,7 +354,7 @@
 
   // Lets go of all piano keys we think are held (their note-off messages may never arrive).
   function releaseMidiNotes() {
-    Object.keys(midiHeld).forEach(function (m) { noteOff(+m, 'midi'); });
+    Object.keys(midiHeld).forEach(function (m) { while (midiHeld[m]) noteOff(+m, 'midi'); });
   }
 
   function onMidiMessage(e) {
@@ -587,7 +593,7 @@
         var f = step.fingers && step.fingers[fm];
         if (!f || fm < geo.lo || fm > geo.hi) return;
         var kr = keyRect(fm), black = isBlack(fm);
-        var rad = black ? Math.min(kr.w * 0.42, 12) : Math.min(ww * 0.34, 14);
+        var rad = Math.max(7, black ? Math.min(kr.w * 0.42, 12) : Math.min(ww * 0.34, 14));   // readable even with 88 small keys
         var cy = black ? top + geo.bh - rad - 6 : top + kh - rad - 28;
         ctx.fillStyle = '#14171c';
         ctx.beginPath(); ctx.arc(kr.x + kr.w / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
@@ -651,10 +657,17 @@
   // ---------------------------------------------------------------- computer keyboard (for testing without a piano)
   var KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16 };
   var kbOct = 4, kbDown = {};
-  function typing(e) { var t = e.target && e.target.tagName; return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT'; }
+  // True only while typing text (the slider, buttons and checkboxes don't block the keyboard piano).
+  function typing(e) {
+    var t = e.target;
+    if (!t || !t.tagName) return false;
+    if (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return true;
+    return t.tagName === 'INPUT' && /^(text|search|number|)$/.test(t.type || '');
+  }
   window.addEventListener('keydown', function (e) {
     if (typing(e) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.key.toLowerCase();
+    if (k in KEYMAP || k === 'z' || k === 'x') e.preventDefault();
     if (k === 'z') { kbOct = Math.max(1, kbOct - 1); return; }
     if (k === 'x') { kbOct = Math.min(7, kbOct + 1); return; }
     if (k in KEYMAP && kbDown[k] == null) {
@@ -852,7 +865,9 @@
 
   function recordNote(m) {
     var ta = $('#edText'), now = performance.now(), name = midiToName(m);
-    var v = ta.value, endsWithSpace = !v || /\s$/.test(v);
+    var v = ta.value;
+    if (/\/\/[^\n]*$/.test(v)) v += '\n';   // last line is a // comment: start a new line
+    var endsWithSpace = !v || /\s$/.test(v);
     if (now - chordStart < 90 && !endsWithSpace) {
       ta.value = v + '+' + name;          // part of the same chord
     } else {
@@ -997,6 +1012,9 @@
   $('#btnAgain').onclick = function () { closeModal('mResult'); restart(st.startIdx); };   // same section again
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
+  // Don't leave the practice bar focused: Space/Enter would press the last button again.
+  $('.practicebar').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) b.blur(); });
+  $('#progress').addEventListener('change', function (e) { e.target.blur(); });
   document.querySelectorAll('#handSeg button').forEach(function (b) {
     b.addEventListener('click', function () {
       document.querySelectorAll('#handSeg button').forEach(function (x) { x.classList.toggle('on', x === b); });
