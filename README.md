@@ -63,10 +63,18 @@ and **restore** it later or on another device.
   middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
   can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
   missed, and *Practise these notes* makes a round with more of them.
-- **Lessons** (Songs → *Lessons*): six short exercises for the hands, one skill each: the five-finger
-  position, alternating hands, thumb under, hold and move, the scale in contrary motion, and major and
-  minor chords. Each one starts with a one-sentence instruction. ○ not tried yet, ◐ tried,
-  ✓ learnt (95% or more); *Next lesson* in the result leads on to the next one.
+- **Lessons** (Songs → *Lessons*): eight short lessons, one skill each: finding your way on the keyboard,
+  the five-finger position, holding notes, loud and soft, alternating hands, thumb under, the scale in
+  contrary motion, and major and minor chords. Each lesson is a row of small steps:
+  - *cards* explain the skill, with a keyboard picture (the keys you press light up in it) and *Listen*;
+    some ask you to find keys on your piano (e.g. every C);
+  - *play steps* are short pieces, from a few notes to a little piece at the end. A step is passed at 80%
+    right first time, plus its own check: long notes held to the end (the app notices a key let go too
+    early), or loud and soft clearly different (this needs a piano connected by USB, which tells how
+    strongly each key was struck; the result shows it as a chart).
+  ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
+  steps again; lessons are played in wait mode. The fingers and the hand shape can't be checked – the
+  lessons show and explain them.
 - **Reading mode** (👁 Read, with the sheet music): the screen keyboard no longer shows which key to play,
   so you read the notes from the sheet music instead. After a wrong key the right one lights up; tapping a
   note in the score shows its keys too.
@@ -107,7 +115,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
 - `js/drills.js` - note reading drills (generates the rounds)
-- `js/lessons.js` - the lessons (technique exercises) and their progress
+- `js/lessons.js` - the lessons: their steps, the keyboard pictures, the checks (held notes, loud and soft)
 - `js/tempo.js` - play along: count-in clicks, timing of each key, score
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app

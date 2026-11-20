@@ -404,6 +404,55 @@ body {
 .songlist .mark { display: inline-block; width: 1.1em; text-align: center; color: var(--muted); }
 .songlist .mark.done { color: var(--good); font-weight: 700; }
 
+/* lesson card: one step (learn / find / play) */
+#btnLesson { flex: none; }
+.lesson-card { min-width: 0; }   /* the wide keyboard picture must not widen the card */
+.lesson-card h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.lc-dots { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lc-dots .dot {
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px;
+  border: 1px solid var(--line-hi); background: var(--panel2); color: var(--muted);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.lc-dots .dot.play { border-style: solid; border-color: rgba(76, 154, 255, 0.45); }
+.lc-dots .dot.passed { color: var(--good); border-color: var(--good); }
+.lc-dots .dot.cur { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lc-text p { margin: 0 0 8px; line-height: 1.5; }
+.lc-text p:last-child { margin-bottom: 0; }
+.lc-pic:empty { display: none; }
+.kpic { display: block; width: 100%; max-height: 170px; }
+.kpic .kw { fill: #f4f1ea; stroke: #2a2e36; stroke-width: 0.8; }
+.kpic .kb { fill: #1c1f25; stroke: #000; stroke-width: 0.6; }
+.kpic .on { fill: #9cc6ff; }
+.kpic .play { fill: #b8dcc8; }
+.kpic .ok { fill: var(--good); }
+.kpic .bad { fill: var(--bad); }
+.kpic .km.R { fill: var(--accent); }
+.kpic .km.L { fill: var(--left); }
+.kpic .kf { fill: #fff; font: 700 10px sans-serif; text-anchor: middle; }
+.kpic .kn { fill: #5a606c; font: 600 9px sans-serif; text-anchor: middle; }
+.lc-status { min-height: 1.4em; color: var(--muted); font-size: 14px; }
+.lc-status:empty { display: none; }
+.lc-status.good { color: var(--good); font-weight: 600; }
+.result-note.warn { color: var(--left); }
+.result-note.big { font-size: 17px; }
+.dynchart { margin-top: 12px; }
+.dynchart .bars {
+  display: flex; align-items: flex-end; gap: 3px; height: 80px; padding: 6px 8px;
+  border-radius: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line);
+}
+.dynchart i { flex: 1; min-width: 3px; border-radius: 2px 2px 0 0; background: var(--accent); }
+.dynchart i.p { background: #8fb7e8; opacity: 0.6; }
+.dynchart i.f { background: var(--accent); }
+.dynchart i.c { background: linear-gradient(180deg, var(--accent), #8fb7e8); }
+.dynchart .legend { display: flex; gap: 12px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.dynchart .legend span:first-child { flex: 1; }
+.dynchart .legend .p::before, .dynchart .legend .f::before {
+  content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px;
+  background: #8fb7e8; opacity: 0.6; vertical-align: -1px;
+}
+.dynchart .legend .f::before { background: var(--accent); opacity: 1; }
+
 /* explanation card: tap a symbol in the sheet music */
 #sheetInner { cursor: pointer; }
 .explain {

@@ -44,7 +44,7 @@ test('built-in songs were found', () => {
   assert.equal(builtinSongs().length, declared, 'some built-in songs could not be read by this test');
 });
 
-const LESSONS = Lessons.LIST.map(l => ['lesson ' + l.id, l.text, l.exact]);
+const LESSONS = [].concat(...Lessons.LIST.map(l => Lessons.plays(l).map(s => ['lesson ' + l.id + ' / ' + s.id, s.text, s.exact])));
 for (const [title, text, exact] of builtinSongs().concat(EXTRA, LESSONS)) {
   test('every bar adds up: ' + title, () => {
     const p = parseSongText(text);

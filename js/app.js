@@ -92,7 +92,10 @@
   // Song title in the user's language (built-in songs are stored with English titles).
   function songName(s) {
     if (s && s.drill) return t('drillTitle', { name: t(Drills.level(s.drill).name) });
-    if (s && s.lesson) return t('lessonTitle', { name: t(Lessons.get(s.lesson).name) });
+    if (s && s.lesson) {
+      var ls = Lessons.get(s.lesson), name = t(ls.name);
+      return s.lessonStep ? t('lessonTitleStep', { name: name, n: Lessons.stepIndex(ls, s.lessonStep) + 1, of: ls.steps.length }) : t('lessonTitle', { name: name });
+    }
     var tr = s && s.kind === 'text' && BUILTIN_TITLES[LANG];
     return (tr && tr[s.title]) || (s ? s.title : '');
   }
@@ -162,8 +165,11 @@
       store.set('pliktra.lastSong', song ? song.id : null);
       if (song && !song.lesson) { song.recent = Date.now(); store.set('pliktra.songs', songs); }   // recently played first in the list
     }
+    if (song && song.lesson) setLessonAt(song.lesson, song.lessonStep);
     $('#songTitle').textContent = song ? songName(song) : t('noSong');
+    $('#btnLesson').hidden = !(song && song.lesson);
     showViewToggle();
+    showTempoToggle();
     rebuildSteps();
   }
 
@@ -183,18 +189,21 @@
     st.startIdx = st.idx;
     st.hits = {}; st.stepMistake = false; st.rescue = false; st.missed = {};
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
+    st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer);   // lesson checks (loud/soft, held notes)
     st.viewT = targetT();
     updateStats(); updateHint();
     dirty = true;
   }
 
-  function practiceNote(m) {
+  // v: how strongly the key was struck (MIDI velocity 1-127; none from the screen or computer keys).
+  function practiceNote(m, v) {
     if (!st.song || st.finished || demo) return;
     var step = currentStep();
     if (!step) return;
     if (tempoOn()) { if (pa) playKey(m); else startPlay(); return; }   // play along: the first key starts the count-in
     if (step.notes.indexOf(m) >= 0) {
       if (!st.startTime) { st.startTime = performance.now(); requestWakeLock(); updateHint(); }
+      if (!st.hits[m] && lessonStep() && lessonStep().dyn) { st.lrec.push({ t: step.t, m: m, v: v == null ? null : v }); }
       st.hits[m] = true;
       var done = step.notes.every(function (n) { return st.hits[n]; });
       if (done) advance();
@@ -233,6 +242,7 @@
       setTimeout(showResult, 450);
     }
     updateStats();
+    if (isLesson()) updateHint();   // loud / soft changes from bar to bar
   }
 
   function updateStats() {
@@ -488,9 +498,13 @@
       var res = loop.lastScore != null ? t('roundTempo', { p: loop.lastScore }) : !loop.lastMistakes ? t('roundClean') : loop.lastMistakes === 1 ? t('roundOne') : t('roundMany', { n: loop.lastMistakes });
       h = t('hintRound', { n: loop.laps, result: res });
     }
+    else if (isLesson() && st.lflash) h = st.lflash;   // "Keep holding C3!"
+    else if (isLesson() && st.startTime && !st.finished && lessonStep() && lessonStep().dyn && currentStep()) {
+      h = t({ p: 'dynP', f: 'dynF', cresc: 'dynCresc' }[Lessons.dynAt(lessonStep(), currentStep().t)]);
+    }
     else if (!st.startTime && !st.finished) {
       h = tempoOn() ? t('hintTempo', { p: t('tempoPct', { p: Math.round(settings.tempo * 100) }) })
-        : isLesson() ? t(Lessons.get(st.song.lesson).tip) : t(readingOn() ? 'hintRead' : 'hintStart');
+        : lessonStep() ? t(Lessons.key(Lessons.get(st.song.lesson), lessonStep(), 'h')) : t(readingOn() ? 'hintRead' : 'hintStart');
     }
     $('#hint').textContent = h;
     $('#hint').classList.toggle('count', !!(pa && !pa.flash && pa.count));
@@ -507,7 +521,7 @@
     var full = st.startIdx === 0;
     var key = st.song.id + ':' + st.hand + (r ? '@' + Math.round(r.speed * 100) : '');
     var prev = best[key];
-    var isBest = full && (prev == null || acc > prev);
+    var isBest = full && !lessonStep() && (prev == null || acc > prev);   // lesson steps: passed or not (see lessonResult)
     if (isBest) { best[key] = acc; store.set('pliktra.best', best); }
     var handName = t('hands' + st.hand);
     var note = !full ? t('resPartial', { n: st.startIdx + 1 })
@@ -523,21 +537,19 @@
       '<div class="result-big">' + acc + '%</div>' +
       '<div class="result-sub">' + t(r ? 'tempoSub' : 'resultSub') + '</div>' +
       '<div class="result-lines">' + lines + '</div>' +
-      '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>';
+      (lessonStep() ? '' : '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>');
     var watch = drillWatch();
     if (isDrill()) {
       var wl = el('div', 'result-note watch', watch.length ? t('drillWatch', { list: watch.map(function (w) { return localNoteName(w.name); }).join(', ') }) : t('drillAllRight'));
       $('#resBody').appendChild(wl);
     }
-    var nextLesson = isLesson() && Lessons.next(st.song.lesson);
-    if (isLesson() && !r) {   // lessons are ticked off in wait mode
-      var ls = Lessons.get(st.song.lesson), done = Lessons.status(ls, best) === 'done';
-      $('#resBody').appendChild(el('div', 'result-note' + (done ? ' best' : ''), done ? t('lessonDoneNote')
-        : t(st.hand !== 'B' && Lessons.hands(ls) === 'B' ? 'lessonAimBoth' : 'lessonAim', { p: Lessons.DONE })));
-    }
+    $('#mResultTitle').textContent = t('wellDone');
     $('#btnAgain').lastElementChild.textContent = t(isDrill() ? 'drillNew' : 'playAgain');
+    $('#btnAgain').classList.add('primary');
+    $('#btnNextLesson').classList.remove('primary');
     $('#btnDrillFocus').hidden = !(isDrill() && watch.length);
-    $('#btnNextLesson').hidden = !nextLesson;
+    $('#btnNextLesson').hidden = true;
+    if (lessonStep()) lessonResult(acc, full);
     openModal('mResult');
     releaseWakeLock();
   }
@@ -586,23 +598,236 @@
   }
 
   // ---------------------------------------------------------------- lessons (js/lessons.js)
-  function startLesson(id) {
-    useBothHands();   // written for both hands; one hand can still be picked afterwards
-    closeAll();
-    loadSong(Lessons.song(id));
+  // A lesson is a row of steps. Learn and find steps are cards (#mLesson) with a keyboard picture; play
+  // steps are short pieces on the practice screen (wait mode), checked at the end (lessonResult).
+  // Progress: pliktra.lessons = { <lesson id>: { p: { <play step id>: 1 }, at: <step id last opened> } }.
+  var lessonProg = store.get('pliktra.lessons', {});
+  if (!lessonProg || typeof lessonProg !== 'object') lessonProg = {};
+  var lc = null;        // the open card: { l, i, found: {midi: true}, msg, sig }
+  var preview = null;   // Listen on a card (like demo, without moving the practice screen)
+
+  function progOf(id) {
+    var pr = lessonProg[id];
+    if (!pr || typeof pr !== 'object') pr = lessonProg[id] = {};
+    if (!pr.p || typeof pr.p !== 'object') pr.p = {};
+    return pr;
   }
-  // The "Lessons" section of the song list: ○ new, ◐ tried, ✓ learnt.
+  function saveLessonProg() { store.set('pliktra.lessons', lessonProg); }
+  // From a backup: passed steps are added, nothing is taken away.
+  function mergeLessonProg(src) {
+    if (!src || typeof src !== 'object') return;
+    Lessons.LIST.forEach(function (l) {
+      var s = src[l.id];
+      if (!s || typeof s !== 'object' || !s.p || typeof s.p !== 'object') return;
+      var pr = progOf(l.id);
+      Lessons.plays(l).forEach(function (x) { if (s.p[x.id]) pr.p[x.id] = 1; });
+      if (!pr.at && typeof s.at === 'string' && Lessons.stepIndex(l, s.at) >= 0) pr.at = s.at;
+    });
+    saveLessonProg();
+  }
+  function setLessonAt(id, sid) { var pr = progOf(id); if (pr.at !== sid) { pr.at = sid; saveLessonProg(); } }
+  // The play step being practised, or null.
+  function lessonStep() {
+    if (!isLesson() || !st.song.lessonStep) return null;
+    var l = Lessons.get(st.song.lesson);
+    return l.steps[Lessons.stepIndex(l, st.song.lessonStep)] || null;
+  }
+
+  // From the song list: the card of the step last opened (or the first one).
+  function startLesson(id) {
+    var l = Lessons.get(id), pr = lessonProg[id];
+    closeAll();
+    openLessonCard(id, pr && pr.at ? Math.max(0, Lessons.stepIndex(l, pr.at)) : 0);
+  }
+  function openLessonCard(id, i) {
+    stopPreview();
+    var l = Lessons.get(id);
+    lc = { l: l, i: i, found: {}, msg: '', sig: '' };
+    setLessonAt(id, l.steps[i].id);
+    renderLessonCard();
+    if (!isOpen('mLesson')) openModal('mLesson');
+    $('#lcNext').focus();
+  }
+  function renderLessonCard() {
+    var l = lc.l, s = l.steps[lc.i], pr = progOf(l.id);
+    $('#lcLesson').textContent = (Lessons.LIST.indexOf(l) + 1) + '. ' + t(l.name);
+    var dots = $('#lcDots');
+    dots.innerHTML = '';
+    l.steps.forEach(function (x, k) {
+      var li = el('li'), ok = !!pr.p[x.id];
+      var b = el('button', 'dot ' + x.type + (k === lc.i ? ' cur' : '') + (ok ? ' passed' : ''), ok ? '✓' : String(k + 1));
+      b.type = 'button';
+      b.title = t('lcStep', { n: k + 1 }) + ': ' + t(Lessons.key(l, x, 't')) + (ok ? ' (' + t('lcPassed') + ')' : '');
+      if (k === lc.i) b.setAttribute('aria-current', 'step');
+      b.onclick = function () { openLessonCard(l.id, k); };
+      li.appendChild(b);
+      dots.appendChild(li);
+    });
+    $('#lcTitle').textContent = t(Lessons.key(l, s, 't'));
+    var tx = $('#lcText');
+    tx.innerHTML = '';
+    t(Lessons.key(l, s, 'x')).split('\n').forEach(function (p) { tx.appendChild(el('p', '', p)); });
+    $('#lcListen').hidden = !(s.listen || s.type === 'play');
+    $('#lcBack').hidden = lc.i === 0;
+    var last = lc.i + 1 >= l.steps.length;
+    $('#lcNext').textContent = s.type === 'play' ? t('lcPlay') : last ? t('lessonNext') : t('lcNext');
+    $('#lcNext').hidden = last && s.type !== 'play' && !Lessons.next(l.id);
+    lc.sig = '';
+    updateLessonCard();
+  }
+  // The picture: keys held on the piano, sounding in Listen, found. Called every frame; redraws on change.
+  function updateLessonCard() {
+    if (!lc) return;
+    var s = lc.l.steps[lc.i], pic = Lessons.picFor(s), lit = {};
+    Object.keys(demoKeys).forEach(function (m) { lit[m] = 'play'; });
+    Object.keys(lc.found).forEach(function (m) { lit[m] = 'ok'; });
+    var marked = {};
+    if (pic && pic.marks) parseSongText(pic.marks).notes.forEach(function (n) { marked[n.m] = true; });
+    // held keys: green when it is a key of the picture (or found), red when it is not the one to find
+    Object.keys(held).forEach(function (m) { lit[m] = s.type === 'find' ? (lc.found[m] ? 'ok' : 'bad') : marked[m] ? 'ok' : 'on'; });
+    var sig = JSON.stringify(lit) + '|' + lc.msg;
+    if (sig === lc.sig) return;
+    lc.sig = sig;
+    $('#lcPic').innerHTML = pic ? Lessons.keysSvg(pic, lit) : '';
+    var status = '', found = Object.keys(lc.found).length, all = s.type === 'find' && found >= s.need;
+    if (s.type === 'find') status = all ? t('lcFoundAll') : t('lcFound', { n: found, of: s.need }) + (lc.msg ? ' · ' + lc.msg : '');
+    else if (s.type === 'learn' && pic) status = t('lcTry');
+    $('#lcStatus').textContent = status;
+    $('#lcStatus').classList.toggle('good', all);
+  }
+  // A key played while a card is open (find steps: is it the one asked for?).
+  function lessonCardKey(m) {
+    if (!lc) return;
+    var s = lc.l.steps[lc.i];
+    if (s.type !== 'find') return;
+    if (Lessons.findMatch(s, m)) { lc.found[m] = true; lc.msg = ''; }
+    else if (!lc.found[m]) {
+      var name = midiToName(m);
+      lc.msg = t('lcWrongKey', { name: localNoteName(/\d/.test(s.find) ? name : name.replace(/-?\d+$/, '')) });
+    }
+  }
+  function playLessonStep(id, sid) {
+    closeModal('mLesson');
+    useBothHands();   // one hand can still be picked afterwards
+    loadSong(Lessons.song(id, sid));
+  }
+  function nextLessonCard() {
+    var l = lc.l;
+    if (lc.i + 1 < l.steps.length) openLessonCard(l.id, lc.i + 1);
+    else if (Lessons.next(l.id)) openLessonCard(Lessons.next(l.id).id, 0);
+  }
+  $('#lcNext').onclick = function () {
+    if (!lc) return;
+    var s = lc.l.steps[lc.i];
+    if (s.type === 'play') playLessonStep(lc.l.id, s.id);
+    else nextLessonCard();
+  };
+  $('#lcBack').onclick = function () { if (lc && lc.i > 0) openLessonCard(lc.l.id, lc.i - 1); };
+  $('#lcListen').onclick = function () {
+    if (!lc) return;
+    var s = lc.l.steps[lc.i], sp = +settings.listenSpeed || 1;
+    stopPreview();
+    var notes = playbackNotes(parseSongText(s.listen || s.text).notes);
+    var d = { out: demoOutput(), nodes: [], timers: [], sent: {}, seq: 0, owner: {}, timer: 0 };
+    var start = performance.now() + 150, end = start;
+    notes.forEach(function (n) {
+      var on = start + n.t / sp * 1000, off = on + Math.max(60, n.d / sp * 1000);
+      if (n.next != null) off = Math.min(off, start + n.next / sp * 1000 - 2);
+      demoNote(d, n, on, Math.max(on + 1, off));
+      end = Math.max(end, off);
+    });
+    d.timers.push(setTimeout(function () { if (preview === d) stopPreview(); }, end - performance.now() + 300));
+    preview = d;
+  };
+  function stopPreview() {
+    var d = preview;
+    if (!d) return;
+    preview = null;
+    silence(d);
+    dirty = true;
+  }
+  $('#btnLesson').onclick = function () {
+    if (!isLesson()) return;
+    var l = Lessons.get(st.song.lesson);
+    openLessonCard(l.id, Math.max(0, Lessons.stepIndex(l, st.song.lessonStep)));
+  };
+
+  // Hold check: a long note of the checked hand let go before it ends ("Keep holding C3!").
+  function checkHold(m) {
+    var s = lessonStep(), step = currentStep();
+    if (!s || !s.hold || !step || !st.startTime || st.finished || (st.hand !== 'B' && st.hand !== s.hold)) return;
+    if (!st.holdSpans || st.holdSpans.text !== s.text) st.holdSpans = { text: s.text, spans: Lessons.holdSpans(s.text, s.hold) };
+    var sp = Lessons.holdBroken(st.holdSpans.spans, m, step.t);
+    if (!sp || st.lhold.indexOf(sp) >= 0) return;
+    st.lhold.push(sp);
+    st.lflash = t('holdFlash', { note: localNoteName(midiToName(m)) });
+    clearTimeout(st.lflashTimer);
+    st.lflashTimer = setTimeout(function () { st.lflash = ''; updateHint(); }, 1600);
+    updateHint();
+  }
+
+  // The result of a play step: its check, passed or not, and the way on.
+  function lessonResult(acc, full) {
+    var l = Lessons.get(st.song.lesson), s = lessonStep(), body = $('#resBody'), pr = progOf(l.id);
+    var wasDone = Lessons.status(l, pr, best) === 'done';
+    var needBoth = st.hand !== 'B' && Lessons.hands(s.text) !== st.hand;
+    var checkOk = true;
+    if (s.hold && !needBoth) {
+      checkOk = !st.lhold.length;
+      var items = st.lhold.map(function (sp) {
+        return t('holdItem', { note: localNoteName(midiToName(sp.m)), bar: Lessons.barOf(s.text, sp.t) });
+      });
+      body.appendChild(el('div', 'result-note' + (checkOk ? ' best' : ' warn'), checkOk ? t('holdOk') : t('holdBad', { list: items.join(', ') })));
+    }
+    if (s.dyn) {
+      var dc = Lessons.dynCheck(s, st.lrec);
+      checkOk = dc.ok;
+      if (!dc.noPiano) {
+        var chart = el('div', 'dynchart'), bars = el('div', 'bars');
+        st.lrec.forEach(function (r) {
+          var b = el('i', s.dyn === 'cresc' ? 'c' : Lessons.dynAt(s, r.t));
+          b.style.height = Math.max(4, Math.round(r.v / 127 * 100)) + '%';
+          bars.appendChild(b);
+        });
+        chart.appendChild(bars);
+        var leg = el('div', 'legend');
+        leg.appendChild(el('span', '', t('dynLegend')));
+        if (s.dyn !== 'cresc') { leg.appendChild(el('span', 'p', t('dynSoft'))); leg.appendChild(el('span', 'f', t('dynLoud'))); }
+        chart.appendChild(leg);
+        body.appendChild(chart);
+      }
+      body.appendChild(el('div', 'result-note' + (dc.ok ? ' best' : ' warn'), t(dc.noPiano ? 'dynNoPiano'
+        : s.dyn === 'cresc' ? (dc.ok ? 'dynCrescOk' : 'dynCrescFlat') : (dc.ok ? 'dynOk' : 'dynFlat'))));
+    }
+    var passed = full && !needBoth && acc >= Lessons.PASS && checkOk;
+    if (passed && !pr.p[s.id]) { pr.p[s.id] = 1; saveLessonProg(); }
+    var nowDone = !wasDone && Lessons.status(l, pr, best) === 'done';
+    var verdict = passed ? t('stepPassed') : !full ? t('resPartial', { n: st.startIdx + 1 })
+      : needBoth ? t('stepBoth') : acc < Lessons.PASS ? t('stepAim', { p: Lessons.PASS }) : '';
+    if (verdict) body.appendChild(el('div', 'result-note' + (passed ? ' best' : ''), verdict));
+    if (nowDone) body.appendChild(el('div', 'result-note best big', t('lessonDoneNote')));
+    $('#mResultTitle').textContent = t(passed ? 'stepPassedTitle' : 'stepNotYetTitle');
+    var i = Lessons.stepIndex(l, s.id), more = i + 1 < l.steps.length, nextL = Lessons.next(l.id);
+    var nb = $('#btnNextLesson');
+    nb.textContent = t(more ? 'lessonNextStep' : 'lessonNext');
+    nb.hidden = !more && !nextL;
+    nb.classList.toggle('primary', passed);
+    $('#btnAgain').classList.toggle('primary', !passed);
+  }
+
+  // The "Lessons" section of the song list: ○ new, ◐ started, ✓ learnt.
   function lessonSectionEl() {
     var det = el('details', 'section lessons');
     det.open = sectionOpen.lessons != null ? sectionOpen.lessons : isLesson();
     var sum = el('summary', '', t('lessonSection'));
     sum.addEventListener('click', function () { sectionOpen.lessons = !det.open; });
     det.appendChild(sum);
-    det.appendChild(el('p', 'muted small', t('lessonIntro', { p: Lessons.DONE })));
+    det.appendChild(el('p', 'muted small', t('lessonIntro')));
     var ul = el('ul', 'songlist');
     Lessons.LIST.forEach(function (ls, i) {
       var li = el('li', st.song && st.song.lesson === ls.id ? 'current' : '');
-      var pick = el('button', 'pick'), status = Lessons.status(ls, best);
+      var pr = lessonProg[ls.id], status = Lessons.status(ls, pr, best), pick = el('button', 'pick');
+      var nPassed = pr ? Lessons.passedCount(ls, pr) : 0;
       pick.type = 'button';
       var name = el('span', 'name');
       var mark = el('span', 'mark ' + status, Lessons.MARK[status]);
@@ -610,7 +835,8 @@
       name.appendChild(mark);
       name.appendChild(document.createTextNode(' ' + (i + 1) + '. ' + t(ls.name)));
       pick.appendChild(name);
-      pick.appendChild(el('span', 'meta', t(ls.desc) + bestLabel({ id: 'lesson:' + ls.id })));
+      pick.appendChild(el('span', 'meta', t(ls.desc) + (nPassed && status !== 'done'
+        ? ' · ' + t('lessonStepsMeta', { n: nPassed, of: Lessons.plays(ls).length }) : '')));
       pick.onclick = function () { startLesson(ls.id); };
       li.appendChild(pick);
       ul.appendChild(li);
@@ -623,14 +849,16 @@
   var midiHeld = {};   // keys currently held on the piano (to release them if the piano goes away)
   var lastNoteAt = 0;
 
-  function noteOn(m, src) {
+  // v: velocity (piano only)
+  function noteOn(m, src, v) {
     held[m] = (held[m] || 0) + 1;
     if (src === 'midi') midiHeld[m] = (midiHeld[m] || 0) + 1;   // counted, like held[]
     lastNoteAt = performance.now();
     if (st.startTime && !st.finished) requestWakeLock();
     if (src !== 'midi' && settings.sound) synth.on(m);
     if (isOpen('mEditor')) { if (recording) recordNote(m); }
-    else if (!anyModalOpen()) practiceNote(m);
+    else if (isOpen('mLesson')) { lessonCardKey(m); updateLessonCard(); }
+    else if (!anyModalOpen()) practiceNote(m, src === 'midi' ? v : null);
     updateHeld();
     dirty = true;
   }
@@ -643,6 +871,8 @@
     var c = (held[m] || 0) - 1;
     if (c > 0) held[m] = c; else delete held[m];
     if (src !== 'midi') synth.off(m);
+    if (c <= 0 && isLesson() && !anyModalOpen()) checkHold(m);
+    if (lc) updateLessonCard();
     updateHeld();
     dirty = true;
   }
@@ -695,7 +925,7 @@
     var d = e.data;
     if (!d || d.length < 3) return;
     var type = d[0] & 0xF0;
-    if (type === 0x90 && d[2] > 0) noteOn(d[1], 'midi');
+    if (type === 0x90 && d[2] > 0) noteOn(d[1], 'midi', d[2]);
     else if (type === 0x80 || (type === 0x90 && d[2] === 0)) noteOff(d[1], 'midi');
   }
 
@@ -895,7 +1125,7 @@
   // With a tempo chosen, the first key starts a count-in, then the music runs at that speed and
   // doesn't wait. Every note of the practised hand is judged in time / early / late / missed
   // (rules in js/tempo.js). Practising one hand, the app can play the other one (as Listen does).
-  function tempoOn() { return settings.tempo > 0; }
+  function tempoOn() { return settings.tempo > 0 && !isLesson(); }   // lessons are played in wait mode
   function paMs(t) { return pa.startMs + (t - pa.tc) / pa.speed * 1000; }      // song time -> performance.now()
   function paT(now) { return pa.tc + (now - pa.startMs) / 1000 * pa.speed; }   // performance.now() -> song time
   function tempoLabel(speed) {
@@ -1032,6 +1262,8 @@
   // The Tempo button opens a small menu: off (wait) or a speed, metronome, the other hand.
   function showTempoToggle() {
     var b = $('#btnTempo');
+    b.disabled = isLesson();
+    if (b.disabled) closeTempoMenu();
     b.classList.toggle('on', tempoOn());
     b.querySelector('.lbl').textContent = tempoOn() ? t('tempoPct', { p: Math.round(settings.tempo * 100) }) : t('tempo');
   }
@@ -1409,6 +1641,7 @@
       dirty = true;
     }
     if (dirty && geo) { dirty = false; draw(now); }
+    if (lc) updateLessonCard();
     requestAnimationFrame(frame);
   }
 
@@ -1481,11 +1714,12 @@
   function closeModal(id) {
     $('#' + id).classList.remove('open');
     if (id === 'mEditor') setRecording(false);
+    if (id === 'mLesson') { stopPreview(); lc = null; }
     dirty = true;
   }
   function isOpen(id) { return $('#' + id).classList.contains('open'); }
   function anyModalOpen() { return !!document.querySelector('.modal.open'); }
-  function closeAll() { ['mLibrary', 'mSong', 'mEditor', 'mImport', 'mResult', 'mSettings'].forEach(closeModal); }
+  function closeAll() { ['mLibrary', 'mSong', 'mEditor', 'mImport', 'mResult', 'mSettings', 'mLesson'].forEach(closeModal); }
 
   document.querySelectorAll('[data-close]').forEach(function (b) {
     b.addEventListener('click', function () { dismissModal(b.closest('.modal').id); });   // asks if the editor has changes
@@ -1821,7 +2055,8 @@
       typed.length === 1 ? t('quote', { t: songName(typed[0]) }) : t('theseSongs', { n: typed.length }));
   };
   $('#btnBackup').onclick = function () {
-    var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }) };
+    var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }),
+      lessons: lessonProg };   // lesson progress (older backups don't have it)
     var a = el('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     a.download = 'pliktra-songs-' + new Date().toISOString().slice(0, 10) + '.json';
@@ -1837,6 +2072,7 @@
       try { data = JSON.parse(txt); } catch (err) { /* handled below */ }
       var playing = st.song, oldNotes = playing && playing.notes;
       importSongs(data && data.app === 'pliktra' ? data.songs : null, t('backupDamaged'), true);
+      if (data && data.app === 'pliktra') mergeLessonProg(data.lessons);
       if (playing && playing.notes !== oldNotes) loadSong(playing);   // the song being practised was updated
       renderLibrary();
     });
@@ -2087,7 +2323,13 @@
     closeModal('mResult'); restart(st.startIdx);   // same section again
   };
   $('#btnDrillFocus').onclick = function () { if (isDrill()) startDrill(st.song.drill, drillWatch()); };
-  $('#btnNextLesson').onclick = function () { var n = isLesson() && Lessons.next(st.song.lesson); if (n) startLesson(n.id); };
+  $('#btnNextLesson').onclick = function () {   // the next step's card, or the next lesson
+    if (!isLesson()) return;
+    var l = Lessons.get(st.song.lesson), i = Lessons.stepIndex(l, st.song.lessonStep), n = Lessons.next(l.id);
+    closeModal('mResult');
+    if (i + 1 < l.steps.length) openLessonCard(l.id, i + 1);
+    else if (n) openLessonCard(n.id, 0);
+  };
   $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
   // Don't leave the practice bar focused: Space/Enter would press the last button again.
@@ -2129,8 +2371,10 @@
   resize();
   var lastId = store.get('pliktra.lastSong', null);
   if (!importFromHash()) {
-    var lastLesson = /^lesson:(.+)$/.exec(lastId || '');
-    loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || (lastLesson && Lessons.song(lastLesson[1])) || songs[0] || null);
+    // A lesson: its step last opened (a card: the next play step after it).
+    var lastLesson = /^lesson:(.+)$/.exec(lastId || ''), ll = lastLesson && Lessons.get(lastLesson[1]);
+    var lessonSong = ll && Lessons.song(ll.id, Lessons.playFrom(ll, (lessonProg[ll.id] || {}).at).id);
+    loadSong(songs.filter(function (s) { return s.id === lastId; })[0] || lessonSong || songs[0] || null);
   }
   initMidi();
   requestAnimationFrame(frame);

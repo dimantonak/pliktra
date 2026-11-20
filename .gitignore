@@ -1,8 +1,9 @@
-# photos of sheet music (copyrighted) stay local
+# photos and scans of sheet music (copyrighted) stay local
 *.jpg
 *.jpeg
 *.png
 *.heic
+*.pdf
 # ...except the app's own icons
 !icons/*.png
 
