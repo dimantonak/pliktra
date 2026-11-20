@@ -45,11 +45,33 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
 - **Song links**: *⋯ → Share as link* on a typed song makes a link; opening it on another device adds the song there.
   The song is inside the link itself (after `#`), so it is never stored on the website or in this repository.
 
-Songs, settings and best scores are saved in the browser on that device (localStorage).
-In the Songs screen you can **share all songs** as one link, **save a backup file** (all songs and best scores)
-and **restore** it later or on another device.
+Songs, settings, best scores, lesson progress and tricky notes are saved in the browser on that device
+(localStorage); there is no account and no server. In the Songs screen you can **share all songs** as one link,
+**save a backup file** (all songs, best scores, lesson progress and tricky notes) and **restore** it later or on
+another device.
 
-## Practice views
+## Lessons and note reading
+
+- **Lessons** (Songs → *Lessons*): eight short lessons, one skill each: finding your way on the keyboard,
+  the five-finger position, holding notes, loud and soft, alternating hands, thumb under, the scale in
+  contrary motion, and major and minor chords. Each lesson is a row of small steps:
+  - *cards* explain the skill, with a keyboard picture (the keys you press light up in it; without a piano
+    you can tap its keys) and *Listen*; some ask you to find keys on your piano (e.g. every C);
+  - *play steps* are short pieces, from a few notes to a little piece at the end. A step is passed at 80%
+    right first time, plus its own check: long notes held to the end (the app notices a key let go too
+    early), or loud and soft clearly different (this needs a piano connected by USB, which tells how
+    strongly each key was struck; the result shows it as a chart).
+  ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
+  steps again; lessons are played in wait mode. The fingers and the hand shape can't be checked – the
+  lessons show and explain them.
+- **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
+  middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
+  can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
+  missed, and *Practise these notes* makes a round with more of them. Missed notes are also kept as
+  *tricky notes* for each level, until you have read each one right in two rounds; the level's
+  *Tricky notes* button in the list starts a round full of them.
+
+## Practising a song
 
 - **♫ Sheet** (default): the song as sheet music (grand staff). The notes to play are coloured
   (blue = right hand, orange = left hand), played notes fade, and the score scrolls along.
@@ -59,24 +81,6 @@ and **restore** it later or on another device.
   (or point at it with a mouse). A card explains it: its name, how many beats it lasts, where the
   note sits on the staff, ♯/♭/♮, ties, finger numbers. The note's keys light up on the keyboard,
   and *Play* lets you hear it. *Settings → What the symbols mean* lists them all with pictures.
-- **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
-  middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
-  can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
-  missed, and *Practise these notes* makes a round with more of them. Missed notes are also kept as
-  *tricky notes* for each level, until you have read each one right in two rounds; the level's
-  *Tricky notes* button in the list starts a round full of them.
-- **Lessons** (Songs → *Lessons*): eight short lessons, one skill each: finding your way on the keyboard,
-  the five-finger position, holding notes, loud and soft, alternating hands, thumb under, the scale in
-  contrary motion, and major and minor chords. Each lesson is a row of small steps:
-  - *cards* explain the skill, with a keyboard picture (the keys you press light up in it) and *Listen*;
-    some ask you to find keys on your piano (e.g. every C);
-  - *play steps* are short pieces, from a few notes to a little piece at the end. A step is passed at 80%
-    right first time, plus its own check: long notes held to the end (the app notices a key let go too
-    early), or loud and soft clearly different (this needs a piano connected by USB, which tells how
-    strongly each key was struck; the result shows it as a chart).
-  ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
-  steps again; lessons are played in wait mode. The fingers and the hand shape can't be checked – the
-  lessons show and explain them.
 - **Reading mode** (👁 Read, with the sheet music): the screen keyboard no longer shows which key to play,
   so you read the notes from the sheet music instead. After a wrong key the right one lights up; tapping a
   note in the score shows its keys too.
@@ -90,10 +94,11 @@ and **restore** it later or on another device.
   and tap *Set end*. Each round shows your wrong keys; tap Loop again to stop.
 - **Tempo (play along)**: choose 40, 60, 80 or 100% of the speed. Press any key for a one-bar count-in; then
   the music runs on and doesn't wait. Every note counts as in time, a bit early or late, or missed; the result
-  shows a timing score, with a best score per speed. Optional metronome; when you practise one hand, the app
-  can play the other one. Each key you play flashes green (in time) or amber (a bit early or late). With a
+  shows a timing score, with a best score per speed. The count-in and the optional metronome click through the
+  device's speaker (a piano's own metronome doesn't know where the bars start). When you practise one hand,
+  the app can play the other one. Each key you play flashes green (in time) or amber (a bit early or late). With a
   loop, each round shows its score; the song list shows your best score at the fastest speed played.
-  *Off (wait)* is the usual wait mode.
+  *Off (wait)* is the usual wait mode; lessons are always played in wait mode.
 
 ## Languages
 
