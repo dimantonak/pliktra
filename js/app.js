@@ -190,7 +190,8 @@
     st.startIdx = st.idx;
     st.hits = {}; st.stepMistake = false; st.rescue = false; st.missed = {};
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
-    st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer);   // lesson checks (loud/soft, held notes)
+    st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer);
+    timed = {};   // no timing colour left over from before   // lesson checks (loud/soft, held notes)
     st.viewT = targetT();
     updateStats(); updateHint();
     dirty = true;
@@ -1235,7 +1236,7 @@
     var endT = t1;   // song time when everything has been played
     other.forEach(function (n) { endT = Math.max(endT, n.t + n.d); });
     var info = st.song.kind === 'text' ? parseSongText(st.song.text) : null;
-    var clicks = Tempo.clicks(info, t0, t1, settings.metronome), num = 0;
+    var clicks = Tempo.clicks(info, t0, Math.max(t1, endT - 0.05), settings.metronome), num = 0;   // metronome until the other hand ends too
     clicks.forEach(function (c) { num = c.accent ? 1 : num + 1; c.num = num; });
     closeTempoMenu();   // a key pressed with the menu open starts the count-in: don't play behind it
     pa = { from: from, to: to, t0: t0, t1: t1, endT: endT, speed: settings.tempo, targets: targets, byKey: byKey, stepT: stepT,
