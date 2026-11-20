@@ -19,7 +19,7 @@ Open the link, connect the piano and allow MIDI access when the browser asks.
 The pill at the top right shows the piano's name when it is connected.
 
 Without a piano you can tap the on-screen keys or use a computer keyboard
-(`A W S E D F T G Y H U J K` = C to C, `Z`/`X` = octave down/up).
+(`A W S E D F T G Y H U J K` = C to C, `Z`/`X` = octave down/up, Space = sustain pedal).
 
 ## Songs
 
@@ -52,18 +52,25 @@ another device.
 
 ## Lessons and note reading
 
-- **Lessons** (Songs → *Lessons*): eight short lessons, one skill each: finding your way on the keyboard,
-  the five-finger position, holding notes, loud and soft, alternating hands, thumb under, the scale in
-  contrary motion, and major and minor chords. Each lesson is a row of small steps:
+- **Lessons** (Songs → *Lessons*): eleven short lessons, one skill each: finding your way on the keyboard,
+  the five-finger position, counting, holding notes, loud and soft, legato, alternating hands, thumb under,
+  the scale in contrary motion, major and minor chords, and the sustain pedal. Each lesson is a row of small steps:
   - *cards* explain the skill, with a keyboard picture (the keys you press light up in it; without a piano
     you can tap its keys) and *Listen*; some ask you to find keys on your piano (e.g. every C);
   - *play steps* are short pieces, from a few notes to a little piece at the end. A step is passed at 80%
-    right first time, plus its own check: long notes held to the end (the app notices a key let go too
-    early), or loud and soft clearly different (this needs a piano connected by USB, which tells how
-    strongly each key was struck; the result shows it as a chart).
+    right first time, plus its own check:
+    - *holding notes*: long notes held to the end (the app notices a key let go too early);
+    - *loud and soft*: clearly different (this needs a piano connected by USB, which tells how strongly
+      each key was struck; the result shows it as a chart);
+    - *legato*: each note joined to the next, with no gap and no long overlap (the result names the joins
+      that weren't smooth);
+    - *pedal*: the sustain pedal changed just after each new chord (lifting it before the chord leaves a
+      gap, not lifting it blurs the chords). The piano sends the pedal over USB; on a computer keyboard,
+      Space is the pedal;
+    - *counting*: these steps don't wait: after a count-in they run at 60% with a metronome, and are
+      scored for timing like *Tempo* below.
   ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
-  steps again; lessons are played in wait mode. The fingers and the hand shape can't be checked – the
-  lessons show and explain them.
+  steps again. The fingers and the hand shape can't be checked – the lessons show and explain them.
 - **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
   middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
   can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
@@ -98,7 +105,8 @@ another device.
   device's speaker (a piano's own metronome doesn't know where the bars start). When you practise one hand,
   the app can play the other one. Each key you play flashes green (in time) or amber (a bit early or late). With a
   loop, each round shows its score; the song list shows your best score at the fastest speed played.
-  *Off (wait)* is the usual wait mode; lessons are always played in wait mode.
+  *Off (wait)* is the usual wait mode. In lessons the Tempo button is off: each step has its own (the
+  counting lesson plays along, the others wait).
 
 ## Languages
 
@@ -124,7 +132,7 @@ and also works without internet (the newest version is loaded whenever you are o
 - `js/sheet.js` - sheet music view (lays out bars and rests, draws with VexFlow)
 - `js/explain.js` - explanations of the sheet music symbols (tap a symbol)
 - `js/drills.js` - note reading drills (generates the rounds)
-- `js/lessons.js` - the lessons: their steps, the keyboard pictures, the checks (held notes, loud and soft)
+- `js/lessons.js` - the lessons: their steps, the keyboard pictures, the checks (held notes, loud and soft, legato, pedal)
 - `js/tempo.js` - play along: count-in clicks, timing of each key, score
 - `vendor/vexflow/` - [VexFlow](https://www.vexflow.com) 4.2.5 with the Bravura music font
 - `sw.js`, `manifest.webmanifest`, `icons/` - offline use and installing as an app

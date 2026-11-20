@@ -191,7 +191,9 @@
     st.hits = {}; st.stepMistake = false; st.rescue = false; st.missed = {};
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
     st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer);
-    timed = {};   // no timing colour left over from before   // lesson checks (loud/soft, held notes)
+    timed = {};   // no timing colour left over from before
+    st.lleg = { last: {}, pairs: [] };   // legato: the last note of each hand, the pairs judged
+    st.lstarts = {}; st.lped = [];       // pedal: when each step was struck, pedal moves   // lesson checks (loud/soft, held notes)
     st.viewT = targetT();
     updateStats(); updateHint();
     dirty = true;
@@ -205,7 +207,7 @@
     if (tempoOn()) { if (pa) playKey(m); else startPlay(); return; }   // play along: the first key starts the count-in
     if (step.notes.indexOf(m) >= 0) {
       if (!st.startTime) { st.startTime = performance.now(); requestWakeLock(); updateHint(); }
-      if (!st.hits[m] && lessonStep() && lessonStep().dyn) { st.lrec.push({ t: step.t, m: m, v: v == null ? null : v }); }
+      if (!st.hits[m] && lessonStep()) lessonKeyDown(m, v, step);
       st.hits[m] = true;
       var done = step.notes.every(function (n) { return st.hits[n]; });
       if (done) advance();
@@ -241,7 +243,7 @@
     }
     if (st.idx >= st.steps.length) {
       st.finished = true;
-      setTimeout(showResult, 450);
+      setTimeout(showResult, lessonStep() && lessonStep().pedal ? 1500 : 450);   // pedal: room to change it after the last chord
     }
     updateStats();
     if (isLesson()) { checkHeldSpans(); updateHint(); }   // long notes still down? loud / soft changes from bar to bar
@@ -505,8 +507,8 @@
       h = t({ p: 'dynP', f: 'dynF', cresc: 'dynCresc' }[Lessons.dynAt(lessonStep(), currentStep().t)]);
     }
     else if (!st.startTime && !st.finished) {
-      h = tempoOn() ? t('hintTempo', { p: t('tempoPct', { p: Math.round(settings.tempo * 100) }) })
-        : lessonStep() ? t(Lessons.key(Lessons.get(st.song.lesson), lessonStep(), 'h')) : t(readingOn() ? 'hintRead' : 'hintStart');
+      h = lessonStep() ? t(Lessons.key(Lessons.get(st.song.lesson), lessonStep(), 'h'))
+        : tempoOn() ? t('hintTempo', { p: t('tempoPct', { p: Math.round(settings.tempo * 100) }) }) : t(readingOn() ? 'hintRead' : 'hintStart');
     }
     $('#hint').textContent = h;
     $('#hint').classList.toggle('count', !!(pa && !pa.flash && pa.count));
@@ -729,15 +731,16 @@
     if (pic && pic.marks) parseSongText(pic.marks).notes.forEach(function (n) { marked[n.m] = true; });
     // held keys: green when it is a key of the picture (or found), red when it is not the one to find
     Object.keys(held).forEach(function (m) { lit[m] = s.type === 'find' ? (lc.found[m] ? 'ok' : 'bad') : marked[m] ? 'ok' : 'on'; });
-    var sig = JSON.stringify(lit) + '|' + lc.msg;
+    var sig = JSON.stringify(lit) + '|' + lc.msg + '|' + pedalDown + pedalSeen;
     if (sig === lc.sig) return;
     lc.sig = sig;
     $('#lcPic').innerHTML = pic ? Lessons.keysSvg(pic, lit) : '';
     var status = '', found = Object.keys(lc.found).length, all = s.type === 'find' && found >= s.need;
     if (s.type === 'find') status = all ? t('lcFoundAll') : t('lcFound', { n: found, of: s.need }) + (lc.msg ? ' · ' + lc.msg : '');
+    else if (s.showPedal) status = t(pedalDown ? 'lcPedalDown' : pedalSeen ? 'lcPedalUp' : 'lcPedalTry');
     else if (s.type === 'learn' && pic) status = t('lcTry');
     $('#lcStatus').textContent = status;
-    $('#lcStatus').classList.toggle('good', all);
+    $('#lcStatus').classList.toggle('good', all || (s.showPedal && pedalDown));
   }
   // A key played while a card is open (find steps: is it the one asked for?).
   function lessonCardKey(m) {
@@ -815,6 +818,49 @@
     openLessonCard(l.id, Math.max(0, Lessons.stepIndex(l, st.song.lessonStep)));
   };
 
+  // A right key in a lesson step: what the checks need (loudness, legato pairs, when each step began).
+  function lessonKeyDown(m, v, step) {
+    var s = lessonStep(), now = performance.now();
+    if (s.dyn) st.lrec.push({ t: step.t, m: m, v: v == null ? null : v });
+    if (s.pedal && st.lstarts[st.idx] == null) {
+      if (!Object.keys(st.lstarts).length) st.lped.unshift({ at: now - 1, down: pedalDown });   // the pedal when playing began
+      st.lstarts[st.idx] = now;
+    }
+    var h = step.hands[m];
+    if (s.legato && (s.legato === 'B' || s.legato === h)) {
+      var own = step.notes.filter(function (x) { return step.hands[x] === h; });
+      var prev = st.lleg.last[h];
+      st.lleg.last[h] = own.length === 1 ? { m: m, at: now, up: null } : null;   // chords are not judged
+      if (!prev || own.length !== 1 || prev.m === m) return;   // the same key again can't be joined
+      var pair = { from: prev.m, to: m, t: step.t, h: h, press: now, res: null };
+      if (prev.up != null) judgeLegato(pair, prev.up); else prev.pair = pair;   // decided when the old key comes up
+      st.lleg.pairs.push(pair);
+    }
+  }
+  function judgeLegato(pair, upAt) {
+    pair.res = Lessons.legatoGrade(pair.press, upAt);
+    if (pair.res !== 'ok' && !st.finished) lessonFlash(t(pair.res === 'gap' ? 'legatoGapFlash' : 'legatoOverlapFlash'));
+  }
+  // Legato: a key of a judged note came up.
+  function lessonKeyUp(m) {
+    if (!st.lleg) return;
+    var now = performance.now();
+    ['R', 'L'].forEach(function (h) {
+      var last = st.lleg.last[h];
+      if (last && last.m === m && last.up == null) last.up = now;
+    });
+    st.lleg.pairs.forEach(function (p) {
+      if (p.res == null && p.from === m) judgeLegato(p, now);
+    });
+    // the pair's old note may no longer be "last": find it by its pending pair
+  }
+  function lessonFlash(text) {
+    st.lflash = text;
+    clearTimeout(st.lflashTimer);
+    st.lflashTimer = setTimeout(function () { st.lflash = ''; updateHint(); }, 1400);
+    updateHint();
+  }
+
   // Hold check: a long note of the checked hand let go before it ends ("Keep holding C3!").
   function holdChecked() {   // the step being played, if it has a hold check for the hand(s) practised
     var s = lessonStep();
@@ -877,11 +923,35 @@
       body.appendChild(el('div', 'result-note' + (dc.ok ? ' best' : ' warn'), t(dc.noPiano ? 'dynNoPiano'
         : s.dyn === 'cresc' ? (dc.ok ? 'dynCrescOk' : 'dynCrescFlat') : (dc.ok ? 'dynOk' : 'dynFlat'))));
     }
+    if (s.legato) {
+      var pairs = st.lleg.pairs, now = performance.now();
+      pairs.forEach(function (p) { if (p.res == null) p.res = Lessons.legatoGrade(p.press, now); });   // still down at the end
+      var good = pairs.filter(function (p) { return p.res === 'ok'; }).length;
+      checkOk = pairs.length > 0 && good >= 0.8 * pairs.length;
+      var bad = pairs.filter(function (p) { return p.res !== 'ok'; }).slice(0, 4).map(function (p) {
+        return t(p.res === 'gap' ? 'legatoGapItem' : 'legatoOverlapItem', { a: localNoteName(midiToName(p.from)), b: localNoteName(midiToName(p.to)), bar: Lessons.barOf(s.text, p.t) });
+      });
+      body.appendChild(el('div', 'result-note' + (checkOk ? ' best' : ' warn'),
+        t('legatoScore', { n: good, of: pairs.length }) + (bad.length ? ' ' + t('legatoBad', { list: bad.join(', ') }) : '')));
+    }
+    if (s.pedal) {
+      var pts = Lessons.pedalPoints(s.text), starts = [], idxOf = {};
+      st.steps.forEach(function (x, i) { idxOf[x.t] = i; });
+      pts.forEach(function (pt) { var i = idxOf[pt]; if (i != null && st.lstarts[i] != null) starts.push(st.lstarts[i]); });
+      var used = st.lped.some(function (e) { return e.down; });
+      var pr2 = Lessons.pedalCheck(starts, st.lped, performance.now());
+      checkOk = used && starts.length === pts.length && Lessons.pedalPassed(pr2);
+      var msgs = [];
+      pr2.forEach(function (r, k) { if (r.res !== 'ok') msgs.push(t({ early: 'pedalEarly', blur: 'pedalBlur', missing: 'pedalMissing' }[r.res], { bar: Lessons.barOf(s.text, pts[k]) })); });
+      body.appendChild(el('div', 'result-note' + (checkOk ? ' best' : ' warn'),
+        !used ? t(pedalSeen ? 'pedalNotUsed' : 'pedalNone')
+          : msgs.length ? t('pedalBad', { n: pr2.length - msgs.length, of: pr2.length, list: msgs.slice(0, 4).join('; ') }) : t('pedalOk')));
+    }
     var passed = full && !needBoth && acc >= Lessons.PASS && checkOk;
     if (passed && !pr.p[s.id]) { pr.p[s.id] = 1; saveLessonProg(); }
     var nowDone = !wasDone && Lessons.status(l, pr, best) === 'done';
     var verdict = passed ? t('stepPassed') : !full ? t('resPartial', { n: st.startIdx + 1 })
-      : needBoth ? t('stepBoth') : acc < Lessons.PASS ? t('stepAim', { p: Lessons.PASS }) : '';
+      : needBoth ? t('stepBoth') : acc < Lessons.PASS ? t(s.tempo ? 'stepAimTempo' : 'stepAim', { p: Lessons.PASS }) : '';
     if (verdict) body.appendChild(el('div', 'result-note' + (passed ? ' best' : ''), verdict));
     if (nowDone) body.appendChild(el('div', 'result-note best big', t('lessonDoneNote')));
     $('#mResultTitle').textContent = t(passed ? 'stepPassedTitle' : 'stepNotYetTitle');
@@ -949,15 +1019,29 @@
     var c = (held[m] || 0) - 1;
     if (c > 0) held[m] = c; else delete held[m];
     if (src !== 'midi') synth.off(m);
-    if (c <= 0 && isLesson() && !anyModalOpen()) checkHold(m);
+    if (c <= 0 && isLesson() && !anyModalOpen()) { checkHold(m); lessonKeyUp(m); }
     if (lc) updateLessonCard();
     updateHeld();
     dirty = true;
   }
 
+  // ---------------------------------------------------------------- sustain pedal (from the piano; Space on a computer keyboard)
+  var pedalDown = false, pedalSeen = false;
+  function setPedal(down) {
+    pedalSeen = true;
+    if (down === pedalDown) return;
+    pedalDown = down;
+    var s = lessonStep();
+    // (also just after the last chord: the result waits for its pedal change)
+    if (s && s.pedal && st.startTime && !anyModalOpen()) st.lped.push({ at: performance.now(), down: down });
+    updateHeld();
+    if (lc) updateLessonCard();
+  }
+
   function updateHeld() {
     var ms = Object.keys(held).map(Number).sort(function (a, b) { return a - b; });
-    $('#held').textContent = ms.length ? '♪ ' + ms.map(function (m) { return localNoteName(midiToName(m)); }).join(' ') : '';
+    $('#held').textContent = (ms.length ? '♪ ' + ms.map(function (m) { return localNoteName(midiToName(m)); }).join(' ') : '') +
+      (pedalDown ? (ms.length ? ' · ' : '') + t('pedalShort') : '');
   }
 
   // ---------------------------------------------------------------- Web MIDI
@@ -1003,6 +1087,7 @@
     var d = e.data;
     if (!d || d.length < 3) return;
     var type = d[0] & 0xF0;
+    if (type === 0xB0 && d[1] === 64) { setPedal(d[2] >= 64); return; }   // sustain pedal
     if (type === 0x90 && d[2] > 0) noteOn(d[1], 'midi', d[2]);
     else if (type === 0x80 || (type === 0x90 && d[2] === 0)) noteOff(d[1], 'midi');
   }
@@ -1203,7 +1288,12 @@
   // With a tempo chosen, the first key starts a count-in, then the music runs at that speed and
   // doesn't wait. Every note of the practised hand is judged in time / early / late / missed
   // (rules in js/tempo.js). Practising one hand, the app can play the other one (as Listen does).
-  function tempoOn() { return settings.tempo > 0 && !isLesson(); }   // lessons are played in wait mode
+  // The speed to play along at (0 = wait mode). Lessons: wait mode, except steps written with a tempo.
+  function tempoSpeed() {
+    if (isLesson()) { var ls = lessonStep(); return ls && ls.tempo ? ls.tempo : 0; }
+    return settings.tempo || 0;
+  }
+  function tempoOn() { return tempoSpeed() > 0; }
   function paMs(t) { return pa.startMs + (t - pa.tc) / pa.speed * 1000; }      // song time -> performance.now()
   function paT(now) { return pa.tc + (now - pa.startMs) / 1000 * pa.speed; }   // performance.now() -> song time
   function tempoLabel(speed) {
@@ -1236,10 +1326,11 @@
     var endT = t1;   // song time when everything has been played
     other.forEach(function (n) { endT = Math.max(endT, n.t + n.d); });
     var info = st.song.kind === 'text' ? parseSongText(st.song.text) : null;
-    var clicks = Tempo.clicks(info, t0, Math.max(t1, endT - 0.05), settings.metronome), num = 0;   // metronome until the other hand ends too
+    var metro = isLesson() || settings.metronome;   // lesson tempo steps are about counting: always clicks
+    var clicks = Tempo.clicks(info, t0, Math.max(t1, endT - 0.05), metro), num = 0;   // metronome until the other hand ends too
     clicks.forEach(function (c) { num = c.accent ? 1 : num + 1; c.num = num; });
     closeTempoMenu();   // a key pressed with the menu open starts the count-in: don't play behind it
-    pa = { from: from, to: to, t0: t0, t1: t1, endT: endT, speed: settings.tempo, targets: targets, byKey: byKey, stepT: stepT,
+    pa = { from: from, to: to, t0: t0, t1: t1, endT: endT, speed: tempoSpeed(), targets: targets, byKey: byKey, stepT: stepT,
       ji: 0, si: from, other: other, oi: 0, clicks: clicks, ci: 0, count: '', flash: '',
       tc: clicks.length ? clicks[0].t : t0, startMs: performance.now() + 150,
       ok: 0, early: 0, late: 0, missed: 0, wrong: 0,
@@ -1351,7 +1442,7 @@
     b.disabled = isLesson();
     if (b.disabled) closeTempoMenu();
     b.classList.toggle('on', tempoOn());
-    b.querySelector('.lbl').textContent = tempoOn() ? t('tempoPct', { p: Math.round(settings.tempo * 100) }) : t('tempo');
+    b.querySelector('.lbl').textContent = tempoOn() ? t('tempoPct', { p: Math.round(tempoSpeed() * 100) }) : t('tempo');
   }
   function fillTempoMenu() {
     var seg = $('#tempoSeg');
@@ -1784,6 +1875,9 @@
   window.addEventListener('keydown', function (e) {
     if (typing(e) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.code;
+    if (k === 'Space' && !(document.activeElement || document.body).closest('button, input, select, textarea, summary, a')) {   // the sustain pedal
+      e.preventDefault(); setPedal(true); return;
+    }
     if (k in KEYMAP || k === 'KeyZ' || k === 'KeyX') e.preventDefault();
     if (k === 'KeyZ') { kbOct = Math.max(1, kbOct - 1); return; }
     if (k === 'KeyX') { kbOct = Math.min(7, kbOct + 1); return; }
@@ -1832,6 +1926,7 @@
     m.addEventListener('pointerdown', function (e) { downOutside = e.target === m; });
     m.addEventListener('click', function (e) { if (e.target === m && downOutside) dismissModal(m.id); });
   });
+  window.addEventListener('keyup', function (e) { if (e.code === 'Space' && pedalDown) { e.preventDefault(); setPedal(false); } });
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     var open = document.querySelectorAll('.modal.open');

@@ -4,6 +4,9 @@
 //   play   a short piece on the practice screen (wait mode), with an optional check of the skill:
 //          hold: 'L' / 'R'  long notes of that hand must be held for their whole length
 //          dyn: ['p', 'f', ...] loud (f) or soft (p) per bar, or 'cresc' (louder and louder)
+//          legato: 'R' / 'L' / 'B'  each note joined to the next one (no gap, no long overlap)
+//          pedal: 'bar'  the sustain pedal changed with each bar's chord (legato pedalling)
+//          tempo: 0.6  played along at that speed with the metronome (timing score) instead of wait mode
 // Texts are i18n keys: lx_<lesson>_<step>_t (title), _x (text), _h (hint while playing, play steps).
 // A lesson is learnt when every play step is passed (and was, before lessons had steps, with 95%+).
 // A lesson "song" (id "lesson:<id>") is never stored. Uses notation.js.
@@ -13,6 +16,9 @@ var Lessons = (function () {
   var PASS = 80;     // % of the steps right first time that passes a play step
   var LEGACY = 95;   // old best score ("lesson:<id>:B") that ticked a lesson off
   var DYN_GAP = 20;  // loud notes must be this much stronger than soft ones (MIDI velocity 1-127)
+  var LEGATO_GAP = 80, LEGATO_OVERLAP = 300;   // ms: silence between two notes / both keys down at once
+  var PEDAL_TOL = 60;   // ms: a pedal lift this much before the new chord still counts as "with it"
+  var PEDAL_PASS = 0.75;   // share of the pedal changes that must be clean
 
   var LIST = [
     { id: 'keys', name: 'lessonKeys', desc: 'lessonKeysDesc', steps: [
@@ -34,6 +40,18 @@ var Lessons = (function () {
       { id: 'lplay', type: 'play', text: 'C3/5 D3/4 E3/3 F3/2 | G3/1 F3/2 E3/3 D3/4 | C3/5 E3/3 D3/4 F3/2 | E3/3 G3/1 C3/5_2' },
       { id: 'both', type: 'play', pic: { from: 'C3', to: 'C5', marks: 'C3/5 D3/4 E3/3 F3/2 G3/1 C4/1 D4/2 E4/3 F4/4 G4/5' },
         text: 'C3/5+C4/1 D3/4+D4/2 E3/3+E4/3 F3/2+F4/4 | G3/1+G4/5 F3/2+F4/4 E3/3+E4/3 D3/4+D4/2 | C3/5+C4/1_4' }
+    ] },
+    { id: 'count', name: 'lessonCount', desc: 'lessonCountDesc', steps: [
+      { id: 'beat', type: 'learn', listen: 'C4 C4 C4 C4 | D4 D4 D4 D4 | E4 E4 D4 D4 | C4_4' },
+      { id: 'quarters', type: 'play', tempo: 0.6,
+        text: 'C4/1 C4/1 C4/1 C4/1 | D4/2 D4/2 D4/2 D4/2 | E4/3 E4/3 D4/2 D4/2 | C4/1 C4/1 C4/1 C4/1' },
+      { id: 'lengths', type: 'learn', listen: 'C4_2 D4_2 | E4_2 C4_2 | E4 F4 G4_2 | C4_4' },
+      { id: 'long', type: 'play', tempo: 0.6, text: 'C4/1_2 D4/2_2 | E4/3_2 C4/1_2 | E4/3 F4/4 G4/5_2 | C4/1_4' },
+      { id: 'rests', type: 'play', tempo: 0.6, text: 'C4/1 - C4/1 - | E4/3 - E4/3 - | G4/5 G4/5 - G4/5 | C4/1_2 -_2' },
+      { id: 'tune', type: 'play', tempo: 0.6,
+        // "Au clair de la lune" (French folk song, traditional)
+        text: 'C4/1 C4/1 C4/1 D4/2 | E4/3_2 D4/2_2 | C4/1 E4/3 D4/2 D4/2 | C4/1_4 |\n' +
+              'C4/1 C4/1 C4/1 D4/2 | E4/3_2 D4/2_2 | C4/1 E4/3 D4/2 D4/2 | C4/1_4' }
     ] },
     { id: 'hold', name: 'lessonHold', desc: 'lessonHoldDesc', steps: [
       { id: 'long', type: 'learn', listen: 'C4_4 | E4_2 G4_2 | C4 D4 E4 F4 | G4_4' },
@@ -57,6 +75,15 @@ var Lessons = (function () {
       { id: 'cresc', type: 'learn' },
       { id: 'louder', type: 'play', dyn: 'cresc',
         text: 'C4/1 D4/2 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1 D4/2 E4/3 F4/4 | G4/5_4' }
+    ] },
+    { id: 'legato', name: 'lessonLegato', desc: 'lessonLegatoDesc', steps: [
+      { id: 'smooth', type: 'learn', listen: 'C4 D4 E4 F4 | G4 F4 E4 D4 | C4_4' },
+      { id: 'pairs', type: 'play', legato: 'R', text: 'C4/1 D4/2 C4/1 D4/2 | E4/3 F4/4 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1_4' },
+      { id: 'line', type: 'play', legato: 'R', text: 'C4/1 D4/2 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1 E4/3 D4/2 F4/4 | E4/3 D4/2 C4/1_2' },
+      { id: 'left', type: 'play', legato: 'L', text: 'C3/5 D3/4 E3/3 F3/2 | G3/1 F3/2 E3/3 D3/4 | C3/5 E3/3 D3/4 F3/2 | E3/3 D3/4 C3/5_2' },
+      { id: 'tune', type: 'play', legato: 'R', text: 'G4/5 F4/4 E4/3 D4/2 | E4/3 F4/4 G4/5_2 | E4/3 D4/2 C4/1 D4/2 | E4/3 D4/2 C4/1_2' },
+      { id: 'both', type: 'play', legato: 'B',
+        text: 'C3/5+C4/1 D3/4+D4/2 E3/3+E4/3 F3/2+F4/4 | G3/1+G4/5 F3/2+F4/4 E3/3+E4/3 D3/4+D4/2 | C3/5+C4/1_4' }
     ] },
     { id: 'alternate', name: 'lessonAlt', desc: 'lessonAltDesc', steps: [
       { id: 'ready', type: 'learn', pic: { from: 'C3', to: 'C5', marks: 'C3/5 D3/4 E3/3 F3/2 G3/1 C4/1 D4/2 E4/3 F4/4 G4/5' } },
@@ -102,6 +129,16 @@ var Lessons = (function () {
       { id: 'both', type: 'play', pic: { from: 'C3', to: 'C5', marks: 'C3/5+E3/3+G3/1 C4/1+E4/3+G4/5' },
         text: 'C3/5+E3/3+G3/1_2 C3/5+Eb3/3+G3/1_2 | C3/5+E3/3+G3/1_4 |\n' +
               'C3/5+E3/3+G3/1+C4/1+E4/3+G4/5_2 C3/5+Eb3/3+G3/1+C4/1+Eb4/3+G4/5_2 | C3/5+E3/3+G3/1+C4/1+E4/3+G4/5_4' }
+    ] },
+    { id: 'pedal', name: 'lessonPedal', desc: 'lessonPedalDesc', steps: [
+      { id: 'what', type: 'learn', showPedal: true },
+      { id: 'change', type: 'learn', showPedal: true, listen: 'C4+E4+G4_4 | C4+F4+A4_4' },
+      { id: 'chords', type: 'play', pedal: 'bar',
+        text: 'C4/1+E4/3+G4/5_4 | C4/1+F4/3+A4/5_4 | R:B3/1+D4/2+G4/5_4 | C4/1+E4/3+G4/5_4' },
+      { id: 'bass', type: 'play', pedal: 'bar',
+        text: 'C3/5+C4/1+E4/3+G4/5_4 | F3/2+C4/1+F4/3+A4/5_4 | G3/1+R:B3/1+D4/2+G4/5_4 | C3/5+C4/1+E4/3+G4/5_4' },
+      { id: 'piece', type: 'play', pedal: 'bar',
+        text: 'C3/5+E4/3 G4/5 E4/3 C4/1 | F3/2+F4/3 A4/5 F4/3 C4/1 | G3/1+D4/2 G4/5 D4/2 R:B3/1 | C3/5+C4/1+E4/3+G4/5_4' }
     ] }
   ];
 
@@ -225,6 +262,56 @@ var Lessons = (function () {
       soft: Math.round(ms), loud: Math.round(ml) };
   }
 
+  // ---- the "legato" check: two notes of one hand, one after the other
+  // pressNext: when the next key went down; releasePrev: when the previous one came up (may be later), ms.
+  // -> 'ok', 'gap' (silence between them) or 'overlap' (both down too long: blurred)
+  function legatoGrade(pressNext, releasePrev) {
+    var d = pressNext - releasePrev;
+    return d > LEGATO_GAP ? 'gap' : -d > LEGATO_OVERLAP ? 'overlap' : 'ok';
+  }
+
+  // ---- the "pedal" check (legato pedalling: new chord, then pedal up and down again at once)
+  // The times (seconds) of the steps where the pedal changes: the first step of every bar.
+  function pedalPoints(text) {
+    var p = parseSongText(text), barLen = p.meter[0] * 4 / p.meter[1], pick = p.pickup || 0, out = [];
+    buildSteps(p.notes, 'B').forEach(function (st) {
+      var b = (st.t / BEAT_SEC - pick) / barLen;
+      if (Math.abs(b - Math.round(b)) < 1e-6) out.push(st.t);
+    });
+    return out;
+  }
+  // starts: when each pedal point's chord was struck (ms, rising); events: [{ at, down }] (ms, rising;
+  // the pedal's state when playing began comes first); endAt: when the step ended (ms).
+  // -> [{ res: 'ok' | 'early' (lifted before the new chord) | 'blur' (not lifted) | 'missing' (not down again) }]
+  // Each mistake is told where it happens: after a 'missing' the pedal is up anyway, so the next chord
+  // just has to catch it again (not 'early').
+  function pedalCheck(starts, events, endAt) {
+    function downAt(x) { var d = false; events.forEach(function (e) { if (e.at <= x) d = e.down; }); return d; }
+    function downIn(a, b) { return events.some(function (e) { return e.down && e.at > a && e.at < b; }); }
+    var prev = null;
+    return starts.map(function (s, k) {
+      var next = k + 1 < starts.length ? starts[k + 1] : endAt, res;
+      if (k === 0 || prev === 'missing') {   // the pedal only has to catch this chord
+        res = downAt(s) || downIn(s - PEDAL_TOL, next) ? 'ok' : 'missing';
+      } else if (!downAt(s - PEDAL_TOL)) {
+        res = 'early';
+      } else {
+        var up = events.filter(function (e) { return !e.down && e.at >= s - PEDAL_TOL && e.at < next; })[0];
+        if (!up) res = 'blur';
+        else if (downIn(up.at, next)) res = 'ok';
+        // lifted without pressing again: soon after the chord = forgot to press again; late = the next chord's
+        // early lift, so this chord was not changed at all
+        else res = k + 1 === starts.length || up.at - s < (next - s) / 2 ? 'missing' : 'blur';
+      }
+      prev = res;
+      return { res: res };
+    });
+  }
+  function pedalPassed(results) {
+    var ok = results.filter(function (r) { return r.res === 'ok'; }).length;
+    return results.length > 0 && ok >= PEDAL_PASS * results.length;
+  }
+
   // ---- keyboard picture (SVG text): keys from..to, marks (song text: keys with finger numbers, hand colours),
   // names: 'all' (white keys) / 'c' (only C) / none, lit: { midi: 'on' | 'ok' | 'bad' | 'play' }.
   // Each key has data-m (its MIDI number), so it can be tapped.
@@ -273,7 +360,8 @@ var Lessons = (function () {
 
   return { LIST: LIST, PASS: PASS, MARK: MARK, get: get, next: next, stepIndex: stepIndex, key: key, plays: plays,
     song: song, playFrom: playFrom, hands: hands, barOf: barOf, picFor: picFor, passedCount: passedCount, status: status,
-    holdSpans: holdSpans, holdBroken: holdBroken, dynAt: dynAt, dynCheck: dynCheck, keysSvg: keysSvg, findMatch: findMatch };
+    holdSpans: holdSpans, holdBroken: holdBroken, legatoGrade: legatoGrade, pedalPoints: pedalPoints,
+    pedalCheck: pedalCheck, pedalPassed: pedalPassed, dynAt: dynAt, dynCheck: dynCheck, keysSvg: keysSvg, findMatch: findMatch };
 })();
 
 if (typeof module !== 'undefined') module.exports = { Lessons: Lessons };

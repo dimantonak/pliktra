@@ -77,7 +77,8 @@ test('lesson progress: new, started, done', () => {
   assert.equal(Lessons.status(five, undefined, { 'lesson:five:R': 100 }), 'tried');
   assert.equal(Lessons.status(thumb, undefined, { 'lesson:thumb:R': 96 }), 'done');
   assert.equal(Lessons.next('keys').id, 'five');
-  assert.equal(Lessons.next('triads'), null);
+  assert.equal(Lessons.next('triads').id, 'pedal');
+  assert.equal(Lessons.next('pedal'), null);
   assert.equal(Lessons.song('five', 'pos'), null);   // a learn step is no song
   assert.equal(Lessons.song('nope', 'x'), null);
   assert.equal(Lessons.playFrom(five, 'shape').id, 'skips');
@@ -165,4 +166,41 @@ test('hold check: a long note tapped short before its chord was complete is caug
   const c3 = spans[0];
   assert.equal(Lessons.holdBroken([c3], c3.m, 1 * BEAT_SEC), c3);   // the step after the chord: C3 must still be down
   assert.equal(Lessons.holdBroken([c3], c3.m, 4 * BEAT_SEC), null);  // the next bar: C3 has ended
+});
+
+test('legato check: gap, joined, held together too long', () => {
+  assert.equal(Lessons.legatoGrade(1000, 1000), 'ok');      // let go as the next key went down
+  assert.equal(Lessons.legatoGrade(1000, 1050), 'ok');      // a short overlap is legato
+  assert.equal(Lessons.legatoGrade(1000, 960), 'ok');       // a tiny gap is fine
+  assert.equal(Lessons.legatoGrade(1000, 800), 'gap');      // let go 0.2 s before: silence
+  assert.equal(Lessons.legatoGrade(1000, 1500), 'overlap'); // both down for half a second
+});
+
+test('pedal check: change after each new chord', () => {
+  const pts = Lessons.pedalPoints(Lessons.get('pedal').steps.find(s => s.id === 'piece').text);
+  assert.deepEqual(pts.map(t => t / BEAT_SEC), [0, 4, 8, 12]);   // the first step of every bar
+  const up = at => ({ at, down: false }), dn = at => ({ at, down: true });
+  const starts = [0, 2000, 4000, 6000];
+  // clean: down after chord 1, then up-down just after each new chord
+  let r = Lessons.pedalCheck(starts, [up(-1), dn(300), up(2080), dn(2200), up(3970), dn(4150), up(6100), dn(6250)], 7500);
+  assert.deepEqual(r.map(x => x.res), ['ok', 'ok', 'ok', 'ok']);
+  assert.ok(Lessons.pedalPassed(r));
+  // lifted before chord 2 (a gap), never lifted at chord 3 (blur), not pressed again after chord 4
+  r = Lessons.pedalCheck(starts, [up(-1), dn(300), up(1700), dn(2100), up(6100)], 7500);
+  assert.deepEqual(r.map(x => x.res), ['ok', 'early', 'blur', 'missing']);
+  assert.ok(!Lessons.pedalPassed(r));
+  // pedal never used
+  assert.deepEqual(Lessons.pedalCheck([0, 2000], [up(-1)], 3000).map(x => x.res), ['missing', 'missing']);
+  // held down through bars 2 and 3, lifted just before bar 4: bars 2 and 3 not changed, bar 4 a gap
+  r = Lessons.pedalCheck(starts, [up(-1), dn(-0.5), up(5900)], 7500);
+  assert.deepEqual(r.map(x => x.res), ['ok', 'blur', 'blur', 'early']);
+  // changed after bar 2 but not pressed again: told once (bar 3 then only has to catch its chord)
+  r = Lessons.pedalCheck(starts, [up(-1), dn(300), up(2100), dn(4100), up(6050), dn(6200)], 7500);
+  assert.deepEqual(r.map(x => x.res), ['ok', 'missing', 'ok', 'ok']);
+});
+
+test('counting steps play along at a speed the app offers', () => {
+  const { Tempo } = require('../js/tempo.js');
+  for (const ls of Lessons.LIST) for (const s of ls.steps) if (s.tempo) assert.ok(Tempo.SPEEDS.includes(s.tempo), ls.id + '/' + s.id);
+  assert.ok(Lessons.get('count').steps.filter(s => s.tempo).length >= 3);
 });
