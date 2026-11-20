@@ -226,7 +226,8 @@ var Lessons = (function () {
   }
 
   // ---- keyboard picture (SVG text): keys from..to, marks (song text: keys with finger numbers, hand colours),
-  // names: 'all' (white keys) / 'c' (only C) / none, lit: { midi: 'on' | 'ok' | 'bad' | 'play' }
+  // names: 'all' (white keys) / 'c' (only C) / none, lit: { midi: 'on' | 'ok' | 'bad' | 'play' }.
+  // Each key has data-m (its MIDI number), so it can be tapped.
   function keysSvg(pic, lit) {
     var lo = parseNoteName(pic.from), hi = parseNoteName(pic.to), W = 20, H = 92, BW = 12, BH = 56;
     var marks = {};
@@ -245,7 +246,7 @@ var Lessons = (function () {
         (n.f && !dense ? '<text class="kf' + (white ? '' : ' on-black') + '" x="' + cx + '" y="' + (cy + 4) + '">' + n.f + '</text>' : '');
     };
     whites.forEach(function (m) {
-      out.push('<rect class="kw' + (lit[m] ? ' ' + lit[m] : '') + '" x="' + x[m] + '" y="0" width="' + W + '" height="' + H + '" rx="2"/>');
+      out.push('<rect class="kw' + (lit[m] ? ' ' + lit[m] : '') + '" data-m="' + m + '" x="' + x[m] + '" y="0" width="' + W + '" height="' + H + '" rx="2"/>');
     });
     whites.forEach(function (m) {
       var name = midiToName(m), letter = name.replace(/-?\d+$/, '');
@@ -257,7 +258,7 @@ var Lessons = (function () {
     });
     for (var k = lo; k <= hi; k++) {
       if (!isBlack(k)) continue;
-      out.push('<rect class="kb' + (lit[k] ? ' ' + lit[k] : '') + '" x="' + x[k] + '" y="0" width="' + BW + '" height="' + BH + '" rx="1.5"/>');
+      out.push('<rect class="kb' + (lit[k] ? ' ' + lit[k] : '') + '" data-m="' + k + '" x="' + x[k] + '" y="0" width="' + BW + '" height="' + BH + '" rx="1.5"/>');
       out.push(mark(k, x[k] + BW / 2, BH - 12, false));
     }
     out.push('</svg>');

@@ -242,7 +242,7 @@
       setTimeout(showResult, 450);
     }
     updateStats();
-    if (isLesson()) updateHint();   // loud / soft changes from bar to bar
+    if (isLesson()) { checkHeldSpans(); updateHint(); }   // long notes still down? loud / soft changes from bar to bar
   }
 
   function updateStats() {
@@ -556,8 +556,9 @@
 
   // ---------------------------------------------------------------- note reading drills (js/drills.js)
   // A fresh round of the level; focus = notes to practise more ([{ name, hand }]).
-  function startDrill(id, focus) {
-    var text = Drills.generate(id, { focus: focus });
+  // key: keep this key signature (a focus round of the key-signature level: F#4 belongs to G major)
+  function startDrill(id, focus, key) {
+    var text = Drills.generate(id, { focus: focus, key: key });
     useBothHands();   // a round may use both hands
     closeAll();
     loadSong({ id: 'drill:' + id, title: '', kind: 'text', text: text, notes: parseSongText(text).notes, drill: id, exact: true });
@@ -746,6 +747,25 @@
     silence(d);
     dirty = true;
   }
+  // The picture's keys can be tapped too (without a piano the card covers the screen keyboard).
+  // The picture is redrawn while a key is down, so the pointer is captured by the (stable) box.
+  var picDown = {};   // pointerId -> midi
+  $('#lcPic').addEventListener('pointerdown', function (e) {
+    var k = e.target.closest && e.target.closest('[data-m]');
+    if (!k || picDown[e.pointerId] != null) return;
+    e.preventDefault();
+    try { $('#lcPic').setPointerCapture(e.pointerId); } catch (err) { /* not supported */ }
+    picDown[e.pointerId] = +k.getAttribute('data-m');
+    noteOn(picDown[e.pointerId], 'touch');
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
+    $('#lcPic').addEventListener(type, function (e) {
+      var m = picDown[e.pointerId];
+      if (m == null) return;
+      delete picDown[e.pointerId];
+      noteOff(m, 'touch');
+    });
+  });
   $('#btnLesson').onclick = function () {
     if (!isLesson()) return;
     var l = Lessons.get(st.song.lesson);
@@ -753,12 +773,27 @@
   };
 
   // Hold check: a long note of the checked hand let go before it ends ("Keep holding C3!").
-  function checkHold(m) {
-    var s = lessonStep(), step = currentStep();
-    if (!s || !s.hold || !step || !st.startTime || st.finished || (st.hand !== 'B' && st.hand !== s.hold)) return;
+  function holdChecked() {   // the step being played, if it has a hold check for the hand(s) practised
+    var s = lessonStep();
+    if (!s || !s.hold || !currentStep() || !st.startTime || st.finished || (st.hand !== 'B' && st.hand !== s.hold)) return null;
     if (!st.holdSpans || st.holdSpans.text !== s.text) st.holdSpans = { text: s.text, spans: Lessons.holdSpans(s.text, s.hold) };
-    var sp = Lessons.holdBroken(st.holdSpans.spans, m, step.t);
+    return st.holdSpans.spans;
+  }
+  function checkHold(m) {
+    var spans = holdChecked();
+    if (spans) flagHold(Lessons.holdBroken(spans, m, currentStep().t));
+  }
+  // After each step: a long note that is not down any more although it hasn't ended (e.g. tapped
+  // short before the rest of its chord, so its release came too soon for checkHold to see).
+  function checkHeldSpans() {
+    var spans = holdChecked();
+    if (!spans) return;
+    var now = currentStep().t;
+    spans.forEach(function (sp) { if (!held[sp.m] && Lessons.holdBroken([sp], sp.m, now)) flagHold(sp); });
+  }
+  function flagHold(sp) {
     if (!sp || st.lhold.indexOf(sp) >= 0) return;
+    var m = sp.m;
     st.lhold.push(sp);
     st.lflash = t('holdFlash', { note: localNoteName(midiToName(m)) });
     clearTimeout(st.lflashTimer);
@@ -1150,12 +1185,18 @@
       while (si < to && st.steps[si + 1].t <= n.t + 1e-6) si++;
       (stepT[si] = stepT[si] || []).push(n);
     });
+    // The other hand: to the end of the song (it may go on after the practised hand's last note),
+    // or to the end of the loop.
+    var otherIn = loopOn() ? inRange : function (n) { return n.t >= t0 - 0.001; };
     var other = st.hand !== 'B' && settings.otherHand
-      ? playbackNotes(st.song.notes.filter(function (n) { return inRange(n) && n.h !== st.hand; })) : [];
+      ? playbackNotes(st.song.notes.filter(function (n) { return otherIn(n) && n.h !== st.hand; })) : [];
+    var endT = t1;   // song time when everything has been played
+    other.forEach(function (n) { endT = Math.max(endT, n.t + n.d); });
     var info = st.song.kind === 'text' ? parseSongText(st.song.text) : null;
     var clicks = Tempo.clicks(info, t0, t1, settings.metronome), num = 0;
     clicks.forEach(function (c) { num = c.accent ? 1 : num + 1; c.num = num; });
-    pa = { from: from, to: to, t0: t0, t1: t1, speed: settings.tempo, targets: targets, byKey: byKey, stepT: stepT,
+    closeTempoMenu();   // a key pressed with the menu open starts the count-in: don't play behind it
+    pa = { from: from, to: to, t0: t0, t1: t1, endT: endT, speed: settings.tempo, targets: targets, byKey: byKey, stepT: stepT,
       ji: 0, si: from, other: other, oi: 0, clicks: clicks, ci: 0, count: '', flash: '',
       tc: clicks.length ? clicks[0].t : t0, startMs: performance.now() + 150,
       ok: 0, early: 0, late: 0, missed: 0, wrong: 0,
@@ -1196,11 +1237,12 @@
       p.si = si;
       st.idx = Math.min(si, p.to);
       st.hits = {};
+      st.rescue = false;   // reading mode: the key shown after a mistake was for the old step
       if (si <= p.to) p.stepT[si].forEach(function (y) { if (y.res && y.res !== 'miss') st.hits[y.m] = true; });
       changed = true;
     }
     if (changed) { st.mistakes = p.missed + p.wrong; updateStats(); dirty = true; }
-    if (si > p.to && now > paMs(p.t1) + 400) finishPlay();
+    if (si > p.to && now > paMs(p.t1) + 400 && now > paMs(p.endT) + 150) finishPlay();
   }
 
   function playKey(m) {
@@ -1768,9 +1810,19 @@
       var p = best[s.id + ':' + h[0]];
       if (p != null) parts.push({ h: h[0], txt: t(h[1]).toLowerCase() + ' ' + t('metaPct', { p: p }), p: p });
     });
-    if (!parts.length) return '';
-    if (parts.length === 1 && parts[0].h === 'B') return ' · ' + t('metaBest', { p: parts[0].p });
-    return ' · ' + t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') });
+    // play along: the best score at the fastest speed played ("<id>:<hand>@80"), both hands first
+    var top = null, pre = s.id + ':';
+    Object.keys(best).forEach(function (k) {
+      var m = k.indexOf(pre) === 0 && /^([BRL])@(\d+)$/.exec(k.slice(pre.length));
+      if (!m) return;
+      var c = { speed: +m[2], p: best[k], both: m[1] === 'B' };
+      if (!top || c.speed > top.speed || (c.speed === top.speed && (c.both > top.both || (c.both === top.both && c.p > top.p)))) top = c;
+    });
+    var tempoTxt = top ? t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p }) : '';
+    if (!parts.length) return tempoTxt ? ' · ' + tempoTxt : '';
+    var txt = parts.length === 1 && parts[0].h === 'B' ? t('metaBest', { p: parts[0].p })
+      : t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') });
+    return ' · ' + txt + (tempoTxt ? ' · ' + tempoTxt : '');
   }
 
   // Starter songs: built-in songs the user hasn't changed. Once there are own songs, they are
@@ -2322,7 +2374,7 @@
     if (isDrill()) { startDrill(st.song.drill); return; }   // note reading: new notes
     closeModal('mResult'); restart(st.startIdx);   // same section again
   };
-  $('#btnDrillFocus').onclick = function () { if (isDrill()) startDrill(st.song.drill, drillWatch()); };
+  $('#btnDrillFocus').onclick = function () { if (isDrill()) startDrill(st.song.drill, drillWatch(), parseSongText(st.song.text).key); };
   $('#btnNextLesson').onclick = function () {   // the next step's card, or the next lesson
     if (!isLesson()) return;
     var l = Lessons.get(st.song.lesson), i = Lessons.stepIndex(l, st.song.lessonStep), n = Lessons.next(l.id);

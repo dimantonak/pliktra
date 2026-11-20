@@ -420,7 +420,9 @@ body {
 .lc-text p { margin: 0 0 8px; line-height: 1.5; }
 .lc-text p:last-child { margin-bottom: 0; }
 .lc-pic:empty { display: none; }
-.kpic { display: block; width: 100%; max-height: 170px; }
+.kpic { display: block; width: 100%; max-height: 170px; touch-action: none; }
+.kpic rect { cursor: pointer; }
+.kpic circle, .kpic text { pointer-events: none; }   /* a tap on a finger number presses its key */
 .kpic .kw { fill: #f4f1ea; stroke: #2a2e36; stroke-width: 0.8; }
 .kpic .kb { fill: #1c1f25; stroke: #000; stroke-width: 0.6; }
 .kpic .on { fill: #9cc6ff; }
@@ -829,14 +831,15 @@ table.parts { width: 100%; border-collapse: collapse; }
 .result-note.best { color: var(--good); font-weight: 600; }
 
 /* ---- responsive */
-@media (max-width: 960px) {
+@media (max-width: 1180px) {   /* labels need ~1180px in German */
   .practicebar .lbl { display: none; }
   .practicebar .btn.pending .lbl { display: inline; margin-left: 0; }   /* "Set end" must be readable */
+  .practicebar #btnTempo.on .lbl { display: inline; margin-left: 0; }   /* the speed chosen, e.g. 60% */
   .practicebar .btn { padding: 0 11px; }
 }
 
 @media (max-width: 760px) {
-  .held, #stepCount { display: none; }
+  .held, #stepCount, #btnLesson .lbl { display: none; }
   .bar { gap: 7px; padding: 7px 10px; }
   .seg button { padding: 0 10px; }
 }

@@ -152,3 +152,17 @@ for (const lang of Object.keys(L.LANGS)) {
     L.setLang('en');
   });
 }
+
+test('the picture’s keys can be tapped: each key knows its MIDI number', () => {
+  const svg = Lessons.keysSvg({ from: 'C4', to: 'E4' });
+  assert.deepEqual([...svg.matchAll(/data-m="(\d+)"/g)].map(m => +m[1]).sort((a, b) => a - b), [60, 61, 62, 63, 64]);
+});
+
+test('hold check: a long note tapped short before its chord was complete is caught after the step', () => {
+  // the app checks, after each step, every span that is not down: holdBroken must report it then
+  const text = Lessons.get('hold').steps.find(s => s.id === 'whole').text;
+  const spans = Lessons.holdSpans(text, 'L');
+  const c3 = spans[0];
+  assert.equal(Lessons.holdBroken([c3], c3.m, 1 * BEAT_SEC), c3);   // the step after the chord: C3 must still be down
+  assert.equal(Lessons.holdBroken([c3], c3.m, 4 * BEAT_SEC), null);  // the next bar: C3 has ended
+});

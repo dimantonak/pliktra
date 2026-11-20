@@ -74,3 +74,13 @@ for (const lang of Object.keys(L.LANGS)) {
     L.setLang('en');
   });
 }
+
+test('a focus round of the key signature level keeps the round’s key', () => {
+  // F#4 read wrong in G major: the next round must be G major again, not F major with an F#
+  const focus = [{ name: 'F#4', hand: 'R' }];
+  for (let seed = 1; seed <= 20; seed++) {
+    const text = Drills.generate('keys', { focus: focus, key: 'G', random: seeded(seed) });
+    assert.equal(parseSongText(text).key, 'G', text);
+    assert.deepEqual(offKeyNotes(parseSongText(text).notes, 'G'), [], 'no ♯/♭ against the key: ' + text);
+  }
+});

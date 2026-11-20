@@ -157,7 +157,7 @@ var I18N = {
     // library
     newSong: '+ New song', importMidi: 'Import MIDI file',
     noSongs: 'No songs yet. Create one or import a MIDI file.',
-    metaSteps: '{n} steps', metaStep1: '1 step', metaMidi: 'MIDI file', metaTyped: 'typed', metaBest: 'best {p}%', metaBestHands: 'best: {list}', metaPct: '{p}%',
+    metaSteps: '{n} steps', metaStep1: '1 step', metaMidi: 'MIDI file', metaTyped: 'typed', metaBest: 'best {p}%', metaBestHands: 'best: {list}', metaPct: '{p}%', metaTempoBest: 'play along {speed}: {p}%',
     libHint: 'Tap a song to practise it. ⋯ edits, shares, duplicates or deletes it.',
     starterSongs: 'Starter songs ({n})', moreActions: 'More', moreActionsFor: 'More for “{t}”',
     // sheet music symbols (js/explain.js)
@@ -473,7 +473,7 @@ var I18N = {
     resFirst: 'Erster Wert gespeichert!', resNewBest: 'Neuer Bestwert! (vorher {p} %)', resBest: 'Dein Bestwert: {p} %',
     newSong: '+ Neues Stück', importMidi: 'MIDI-Datei importieren',
     noSongs: 'Noch keine Stücke. Lege eines an oder importiere eine MIDI-Datei.',
-    metaSteps: '{n} Schritte', metaStep1: '1 Schritt', metaMidi: 'MIDI-Datei', metaTyped: 'eingetippt', metaBest: 'Bestwert {p} %', metaBestHands: 'Bestwert: {list}', metaPct: '{p} %',
+    metaSteps: '{n} Schritte', metaStep1: '1 Schritt', metaMidi: 'MIDI-Datei', metaTyped: 'eingetippt', metaBest: 'Bestwert {p} %', metaBestHands: 'Bestwert: {list}', metaPct: '{p} %', metaTempoBest: 'mitgespielt {speed}: {p} %',
     libHint: 'Tippe auf ein Stück, um es zu üben. ⋯ zum Bearbeiten, Teilen, Duplizieren oder Löschen.',
     starterSongs: 'Beispielstücke ({n})', moreActions: 'Mehr', moreActionsFor: 'Mehr zu „{t}“',
     // sheet music symbols (js/explain.js)
