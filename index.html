@@ -14,7 +14,7 @@
 <body>
   <!-- Texts are translated by js/i18n.js: data-i18n (text), data-i18n-html, -title, -aria, -ph. -->
   <header class="bar topbar">
-    <button id="btnSongs" class="btn"><svg class="svg-ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h10"/></svg><span data-i18n="songs">Songs</span></button>
+    <button id="btnSongs" class="btn"><svg class="svg-ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h10"/></svg><span data-i18n="libTitle">Library</span></button>
     <div class="title" id="songTitle" data-i18n="noSong">No song loaded</div>
     <button id="btnLesson" class="btn" hidden title="The lesson: explanations, pictures and all its steps" data-i18n-title="lessonBtnTitle"><svg class="svg-ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5.5C8.5 4.2 6 3.8 3 4.2v11c3-.4 5.5 0 7 1.3 1.5-1.3 4-1.7 7-1.3v-11c-3-.4-5.5 0-7 1.3zM10 5.5v11"/></svg><span class="lbl" data-i18n="lessonBtn">Lesson</span></button>
     <div id="held" class="held"></div>
@@ -85,10 +85,11 @@
       </div>
       <p id="libHint" class="muted small" data-i18n="libHint">Tap a song to practise it. &#8943; edits, shares, duplicates or deletes it.</p>
       <div id="songList"></div>
-      <details class="section backup-details" id="libBackup">
+      <div id="libBackup" class="backup-wrap">
+      <p class="muted small" data-i18n="backupNote">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
+      <details class="section backup-details">
         <summary data-i18n="backupTitle">Backup &amp; share all</summary>
         <div class="backup">
-          <p class="muted small" data-i18n="backupNote">Your songs are saved in this browser only. Keep a backup, or share them all to another device.</p>
           <div class="row gap">
             <button id="btnShareAll" class="btn small" data-i18n="shareAll">Share all songs</button>
             <button id="btnBackup" class="btn small" data-i18n="saveBackup">Save backup file</button>
@@ -96,6 +97,7 @@
           </div>
         </div>
       </details>
+      </div>
     </div>
   </div>
 

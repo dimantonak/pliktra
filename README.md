@@ -36,7 +36,7 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
   Twinkle Twinkle, Jingle Bells, Happy Birthday, Frère Jacques, Row Row Row Your Boat,
   Minuet in G (Petzold) and the opening of Für Elise.
 - **Record from piano**: in the editor, press *Record from piano* and play; notes are typed for you.
-- **MIDI files** (`.mid`): import from the Songs screen and choose which hand plays each part.
+- **MIDI files** (`.mid`): import from the Library and choose which hand plays each part.
 - **Song list**: tap a song to practise it; the songs you played most recently are at the top.
   The starter songs are folded away once you have your own. **⋯** next to a song edits, shares,
   duplicates (e.g. to make an easier version) or deletes it.
@@ -46,13 +46,13 @@ Without a piano you can tap the on-screen keys or use a computer keyboard
   The song is inside the link itself (after `#`), so it is never stored on the website or in this repository.
 
 Songs, settings, best scores, lesson progress and tricky notes are saved in the browser on that device
-(localStorage); there is no account and no server. In the Songs screen you can **share all songs** as one link,
+(localStorage); there is no account and no server. In the Library (*Backup & share all*) you can **share all songs** as one link,
 **save a backup file** (all songs, best scores, lesson progress and tricky notes) and **restore** it later or on
 another device.
 
 ## Lessons and note reading
 
-- **Lessons** (Songs → *Lessons*): eleven short lessons, one skill each: finding your way on the keyboard,
+- **Lessons** (Library → *Lessons* tab): eleven short lessons, one skill each: finding your way on the keyboard,
   the five-finger position, counting, holding notes, loud and soft, legato, alternating hands, thumb under,
   the scale in contrary motion, major and minor chords, and the sustain pedal. Each lesson is a row of small steps:
   - *cards* explain the skill, with a keyboard picture (the keys you press light up in it; without a piano
@@ -72,7 +72,7 @@ another device.
       scored for timing like *Tempo* below.
   ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
   steps again. The fingers and the hand shape can't be checked – the lessons show and explain them.
-- **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
+- **Note reading** (Library → *Note reading* tab): 8 levels of endless drills, from the landmark notes (C3, F3,
   middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
   can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
   missed, and *Practise these notes* makes a round with more of them. Missed notes are also kept as

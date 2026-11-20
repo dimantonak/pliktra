@@ -771,6 +771,7 @@ textarea {
   color: #b7d7ff;
   white-space: nowrap;
 }
+.songlist .score-pill.tempo { background: rgba(245, 180, 69, 0.12); border-color: rgba(245, 180, 69, 0.32); color: #f6c05e; }
 .songlist .score-pill.perfect {
   background: rgba(52, 199, 133, 0.15);
   border-color: rgba(52, 199, 133, 0.32);
@@ -831,7 +832,9 @@ textarea {
 .section .songlist { margin-top: 6px; }
 .section .share-group { margin: 8px 0 4px; }
 
-.backup-details { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.backup-wrap { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.backup-wrap > p { margin: 0 0 2px; }
+.backup-details { margin-top: 0; }
 .backup {
   margin-top: 8px;
   padding: 12px 14px;

@@ -1999,10 +1999,11 @@
         extra.push(t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') }));
       }
     } else if (top) {
-      pill = el('span', 'score-pill' + (top.p >= 100 ? ' perfect' : ''), t('metaPct', { p: top.p }));
+      pill = el('span', 'score-pill tempo', t('metaPillTempo', { speed: t('tempoPct', { p: top.speed }), p: top.p }));   // play along only: say so
       pill.title = t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p });
     }
-    if (top) extra.push(t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p }));
+    if (pill) pill.setAttribute('aria-label', pill.title);
+    if (top && main) extra.push(t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p }));
     return { pill: pill, extra: extra.length ? ' · ' + extra.join(' · ') : '' };
   }
 
@@ -2036,10 +2037,17 @@
 
   function updateLibBadges() {
     var done = Lessons.LIST.filter(function (ls) { return Lessons.status(ls, lessonProg[ls.id], best) === 'done'; }).length;
-    $('#tabLessonsBadge').textContent = done ? done + '/' + Lessons.LIST.length : '';
+    badge('#tabLessonsBadge', done ? done + '/' + Lessons.LIST.length : '', t('lessonSection'), t('lessonProgress', { n: done, of: Lessons.LIST.length }));
     var trickyCount = 0;
     Drills.LEVELS.forEach(function (lv) { trickyCount += trickyOf(lv.id).length; });
-    $('#tabDrillsBadge').textContent = trickyCount ? String(trickyCount) : '';
+    badge('#tabDrillsBadge', trickyCount ? String(trickyCount) : '', t('drillSection'), t('tabTrickyTitle', { n: trickyCount }));
+  }
+  // A tab's count, explained on hover and to screen readers (the tab's name + what the number means).
+  function badge(sel, txt, tab, says) {
+    var b = $(sel), btn = b.closest('button');
+    b.textContent = txt;
+    b.title = txt ? says : '';
+    if (txt) btn.setAttribute('aria-label', tab + ' – ' + says); else btn.removeAttribute('aria-label');
   }
 
   // Tap a song to practise it; ⋯ opens its other actions. Most recently played or added first.

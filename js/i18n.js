@@ -205,9 +205,9 @@ var I18N = {
     // library
     libTitle: 'Library', newSong: '+ New song', importMidi: 'Import MIDI file',
     libSearchPh: 'Search songs or groups…', libNoMatch: 'No matching songs.',
-    backupTitle: 'Backup & share all', lessonProgress: '{n} of {of} learnt',
+    backupTitle: 'Backup & share all', lessonProgress: '{n} of {of} learnt', tabTrickyTitle: 'Tricky notes to practise: {n}',
     noSongs: 'No songs yet. Create one or import a MIDI file.',
-    metaSteps: '{n} steps', metaStep1: '1 step', metaMidi: 'MIDI file', metaBest: 'best {p}%', metaBestHands: 'best: {list}', metaPct: '{p}%', metaTempoBest: 'play along {speed}: {p}%',
+    metaSteps: '{n} steps', metaStep1: '1 step', metaMidi: 'MIDI file', metaBest: 'best {p}%', metaBestHands: 'best: {list}', metaPct: '{p}%', metaPillTempo: '{p}% at {speed}', metaTempoBest: 'play along {speed}: {p}%',
     libHint: 'Tap a song to practise it. ⋯ edits, shares, duplicates or deletes it.',
     starterSongs: 'Starter songs ({n})', moreActions: 'More', moreActionsFor: 'More for “{t}”',
     // sheet music symbols (js/explain.js)
@@ -571,9 +571,9 @@ var I18N = {
     resFirst: 'Erster Wert gespeichert!', resNewBest: 'Neuer Bestwert! (vorher {p} %)', resBest: 'Dein Bestwert: {p} %',
     libTitle: 'Bibliothek', newSong: '+ Neues Stück', importMidi: 'MIDI-Datei importieren',
     libSearchPh: 'Stücke oder Gruppen suchen…', libNoMatch: 'Keine passenden Stücke.',
-    backupTitle: 'Sicherung & alle teilen', lessonProgress: '{n} von {of} gelernt',
+    backupTitle: 'Sicherung & alle teilen', lessonProgress: '{n} von {of} gelernt', tabTrickyTitle: 'Knifflige Noten zum Üben: {n}',
     noSongs: 'Noch keine Stücke. Lege eines an oder importiere eine MIDI-Datei.',
-    metaSteps: '{n} Schritte', metaStep1: '1 Schritt', metaMidi: 'MIDI-Datei', metaBest: 'Bestwert {p} %', metaBestHands: 'Bestwert: {list}', metaPct: '{p} %', metaTempoBest: 'mitgespielt {speed}: {p} %',
+    metaSteps: '{n} Schritte', metaStep1: '1 Schritt', metaMidi: 'MIDI-Datei', metaBest: 'Bestwert {p} %', metaBestHands: 'Bestwert: {list}', metaPct: '{p} %', metaPillTempo: '{p} % bei {speed}', metaTempoBest: 'mitgespielt {speed}: {p} %',
     libHint: 'Tippe auf ein Stück, um es zu üben. ⋯ zum Bearbeiten, Teilen, Duplizieren oder Löschen.',
     starterSongs: 'Beispielstücke ({n})', moreActions: 'Mehr', moreActionsFor: 'Mehr zu „{t}“',
     // sheet music symbols (js/explain.js)
