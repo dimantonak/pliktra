@@ -731,16 +731,19 @@
     if (pic && pic.marks) parseSongText(pic.marks).notes.forEach(function (n) { marked[n.m] = true; });
     // held keys: green when it is a key of the picture (or found), red when it is not the one to find
     Object.keys(held).forEach(function (m) { lit[m] = s.type === 'find' ? (lc.found[m] ? 'ok' : 'bad') : marked[m] ? 'ok' : 'on'; });
-    var sig = JSON.stringify(lit) + '|' + lc.msg + '|' + pedalDown + pedalSeen;
+    var sig = JSON.stringify(lit) + '|' + lc.msg + '|' + pedalDown + pedalSeen + softDown + sostDown;
     if (sig === lc.sig) return;
     lc.sig = sig;
     $('#lcPic').innerHTML = pic ? Lessons.keysSvg(pic, lit) : '';
     var status = '', found = Object.keys(lc.found).length, all = s.type === 'find' && found >= s.need;
     if (s.type === 'find') status = all ? t('lcFoundAll') : t('lcFound', { n: found, of: s.need }) + (lc.msg ? ' · ' + lc.msg : '');
-    else if (s.showPedal) status = t(pedalDown ? 'lcPedalDown' : pedalSeen ? 'lcPedalUp' : 'lcPedalTry');
+    else if (s.showPedal) {   // which of the three pedals are down (only the right one is ever checked)
+      var down = [pedalDown && 'lcPedalDown', softDown && 'lcPedalSoft', sostDown && 'lcPedalSost'].filter(Boolean);
+      status = down.length ? down.map(function (k) { return t(k); }).join(' · ') : t(pedalSeen ? 'lcPedalUp' : 'lcPedalTry');
+    }
     else if (s.type === 'learn' && pic) status = t('lcTry');
     $('#lcStatus').textContent = status;
-    $('#lcStatus').classList.toggle('good', all || (s.showPedal && pedalDown));
+    $('#lcStatus').classList.toggle('good', all || (s.showPedal && (pedalDown || softDown || sostDown)));
   }
   // A key played while a card is open (find steps: is it the one asked for?).
   function lessonCardKey(m) {
@@ -1026,6 +1029,7 @@
   }
 
   // ---------------------------------------------------------------- sustain pedal (from the piano; Space on a computer keyboard)
+  var softDown = false, sostDown = false;   // left (soft, CC 67) and middle (sostenuto, CC 66) pedal: only shown on the pedal cards
   var pedalDown = false, pedalSeen = false, pedalBy = '', sustained = {};   // sustained: built-in sound notes let go while the pedal is down
   function setPedal(down, by) {
     pedalSeen = true;
@@ -1083,6 +1087,8 @@
   function releaseMidiNotes() {
     Object.keys(midiHeld).forEach(function (m) { while (midiHeld[m]) noteOff(+m, 'midi'); });
     if (pedalDown && pedalBy === 'midi') setPedal(false, 'midi');
+    softDown = sostDown = false;
+    if (lc) updateLessonCard();
   }
 
   function onMidiMessage(e) {
@@ -1090,6 +1096,12 @@
     if (!d || d.length < 3) return;
     var type = d[0] & 0xF0;
     if (type === 0xB0 && d[1] === 64) { setPedal(d[2] >= 64, 'midi'); return; }   // sustain pedal
+    if (type === 0xB0 && (d[1] === 66 || d[1] === 67)) {   // middle / left pedal
+      if (d[1] === 66) sostDown = d[2] >= 64; else softDown = d[2] >= 64;
+      pedalSeen = true;
+      if (lc) updateLessonCard();
+      return;
+    }
     if (type === 0x90 && d[2] > 0) noteOn(d[1], 'midi', d[2]);
     else if (type === 0x80 || (type === 0x90 && d[2] === 0)) noteOff(d[1], 'midi');
   }

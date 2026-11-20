@@ -66,7 +66,8 @@ another device.
       that weren't smooth);
     - *pedal*: the sustain pedal changed just after each new chord (lifting it before the chord leaves a
       gap, not lifting it blurs the chords). The piano sends the pedal over USB; on a computer keyboard,
-      Space is the pedal;
+      Space is the pedal. The lesson's first card also names the left (soft) and middle (sostenuto) pedal when
+      you press them, so you can find out which is which (they are not checked);
     - *counting*: these steps don't wait: after a count-in they run at 60% with a metronome, and are
       scored for timing like *Tempo* below.
   ○ not started, ◐ started, ✓ learnt (every play step passed). The *Lesson* button at the top opens the
