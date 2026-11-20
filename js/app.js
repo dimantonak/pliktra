@@ -190,7 +190,7 @@
     st.startIdx = st.idx;
     st.hits = {}; st.stepMistake = false; st.rescue = false; st.missed = {};
     st.mistakes = 0; st.clean = 0; st.startTime = 0; st.finished = false;
-    st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer);
+    st.lrec = []; st.lhold = []; st.lflash = ''; clearTimeout(st.lflashTimer); clearTimeout(st.resultTimer);
     timed = {};   // no timing colour left over from before
     st.lleg = { last: {}, pairs: [] };   // legato: the last note of each hand, the pairs judged
     st.lstarts = {}; st.lped = [];       // pedal: when each step was struck, pedal moves   // lesson checks (loud/soft, held notes)
@@ -243,7 +243,7 @@
     }
     if (st.idx >= st.steps.length) {
       st.finished = true;
-      setTimeout(showResult, lessonStep() && lessonStep().pedal ? 1500 : 450);   // pedal: room to change it after the last chord
+      st.resultTimer = setTimeout(showResult, lessonStep() && lessonStep().pedal ? 1500 : 450);   // pedal: room to change it after the last chord
     }
     updateStats();
     if (isLesson()) { checkHeldSpans(); updateHint(); }   // long notes still down? loud / soft changes from bar to bar
@@ -935,15 +935,15 @@
         t('legatoScore', { n: good, of: pairs.length }) + (bad.length ? ' ' + t('legatoBad', { list: bad.join(', ') }) : '')));
     }
     if (s.pedal) {
-      var pts = Lessons.pedalPoints(s.text), starts = [], idxOf = {};
+      var pts = Lessons.pedalPoints(s.text), starts = [], bars = [], idxOf = {};
       st.steps.forEach(function (x, i) { idxOf[x.t] = i; });
-      pts.forEach(function (pt) { var i = idxOf[pt]; if (i != null && st.lstarts[i] != null) starts.push(st.lstarts[i]); });
+      pts.forEach(function (pt) { var i = idxOf[pt]; if (i != null && st.lstarts[i] != null) { starts.push(st.lstarts[i]); bars.push(Lessons.barOf(s.text, pt)); } });
       var used = st.lped.some(function (e) { return e.down; });
       var pr2 = Lessons.pedalCheck(starts, st.lped, performance.now());
-      checkOk = used && starts.length === pts.length && Lessons.pedalPassed(pr2);
+      checkOk = used && Lessons.pedalPassed(pr2);
       var msgs = [];
-      pr2.forEach(function (r, k) { if (r.res !== 'ok') msgs.push(t({ early: 'pedalEarly', blur: 'pedalBlur', missing: 'pedalMissing' }[r.res], { bar: Lessons.barOf(s.text, pts[k]) })); });
-      body.appendChild(el('div', 'result-note' + (checkOk ? ' best' : ' warn'),
+      pr2.forEach(function (r, k) { if (r.res !== 'ok') msgs.push(t({ early: 'pedalEarly', blur: 'pedalBlur', missing: 'pedalMissing' }[r.res], { bar: bars[k] })); });
+      if (starts.length) body.appendChild(el('div', 'result-note' + (checkOk ? ' best' : ' warn'),   // none: no bar's first chord was played
         !used ? t(pedalSeen ? 'pedalNotUsed' : 'pedalNone')
           : msgs.length ? t('pedalBad', { n: pr2.length - msgs.length, of: pr2.length, list: msgs.slice(0, 4).join('; ') }) : t('pedalOk')));
     }
@@ -1018,7 +1018,7 @@
     }
     var c = (held[m] || 0) - 1;
     if (c > 0) held[m] = c; else delete held[m];
-    if (src !== 'midi') synth.off(m);
+    if (src !== 'midi' && c <= 0) { if (pedalDown) sustained[m] = true; else synth.off(m); }
     if (c <= 0 && isLesson() && !anyModalOpen()) { checkHold(m); lessonKeyUp(m); }
     if (lc) updateLessonCard();
     updateHeld();
@@ -1026,11 +1026,12 @@
   }
 
   // ---------------------------------------------------------------- sustain pedal (from the piano; Space on a computer keyboard)
-  var pedalDown = false, pedalSeen = false;
-  function setPedal(down) {
+  var pedalDown = false, pedalSeen = false, pedalBy = '', sustained = {};   // sustained: built-in sound notes let go while the pedal is down
+  function setPedal(down, by) {
     pedalSeen = true;
     if (down === pedalDown) return;
-    pedalDown = down;
+    pedalDown = down; pedalBy = down ? by : '';
+    if (!down) Object.keys(sustained).forEach(function (m) { delete sustained[m]; if (!held[m]) synth.off(+m); });
     var s = lessonStep();
     // (also just after the last chord: the result waits for its pedal change)
     if (s && s.pedal && st.startTime && !anyModalOpen()) st.lped.push({ at: performance.now(), down: down });
@@ -1081,13 +1082,14 @@
   // Lets go of all piano keys we think are held (their note-off messages may never arrive).
   function releaseMidiNotes() {
     Object.keys(midiHeld).forEach(function (m) { while (midiHeld[m]) noteOff(+m, 'midi'); });
+    if (pedalDown && pedalBy === 'midi') setPedal(false, 'midi');
   }
 
   function onMidiMessage(e) {
     var d = e.data;
     if (!d || d.length < 3) return;
     var type = d[0] & 0xF0;
-    if (type === 0xB0 && d[1] === 64) { setPedal(d[2] >= 64); return; }   // sustain pedal
+    if (type === 0xB0 && d[1] === 64) { setPedal(d[2] >= 64, 'midi'); return; }   // sustain pedal
     if (type === 0x90 && d[2] > 0) noteOn(d[1], 'midi', d[2]);
     else if (type === 0x80 || (type === 0x90 && d[2] === 0)) noteOff(d[1], 'midi');
   }
@@ -1875,8 +1877,8 @@
   window.addEventListener('keydown', function (e) {
     if (typing(e) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.code;
-    if (k === 'Space' && !(document.activeElement || document.body).closest('button, input, select, textarea, summary, a')) {   // the sustain pedal
-      e.preventDefault(); setPedal(true); return;
+    if (k === 'Space' && (lc && lc.l.steps[lc.i].showPedal || !(document.activeElement || document.body).closest('button, input, select, textarea, summary, a'))) {   // the sustain pedal
+      e.preventDefault(); setPedal(true, 'kbd'); return;
     }
     if (k in KEYMAP || k === 'KeyZ' || k === 'KeyX') e.preventDefault();
     if (k === 'KeyZ') { kbOct = Math.max(1, kbOct - 1); return; }
@@ -1894,6 +1896,7 @@
   });
   window.addEventListener('blur', function () {
     Object.keys(kbDown).forEach(function (k) { noteOff(kbDown[k], 'kbd'); delete kbDown[k]; });
+    if (pedalDown && pedalBy === 'kbd') setPedal(false, 'kbd');   // Space's key-up goes to the other window
   });
 
   // ---------------------------------------------------------------- modals
@@ -1926,7 +1929,7 @@
     m.addEventListener('pointerdown', function (e) { downOutside = e.target === m; });
     m.addEventListener('click', function (e) { if (e.target === m && downOutside) dismissModal(m.id); });
   });
-  window.addEventListener('keyup', function (e) { if (e.code === 'Space' && pedalDown) { e.preventDefault(); setPedal(false); } });
+  window.addEventListener('keyup', function (e) { if (e.code === 'Space' && pedalDown && pedalBy === 'kbd') { e.preventDefault(); setPedal(false, 'kbd'); } });
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     var open = document.querySelectorAll('.modal.open');
