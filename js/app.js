@@ -611,14 +611,10 @@
     var r = Drills.trickyRound(trickyOf(id));
     if (r) startDrill(id, r.focus, r.key);
   }
-  // The "Note reading" section of the song list.
-  function drillSectionEl() {
-    var det = el('details', 'section drills');
-    det.open = sectionOpen.drills != null ? sectionOpen.drills : isDrill();
-    var sum = el('summary', '', t('drillSection'));
-    sum.addEventListener('click', function () { sectionOpen.drills = !det.open; });
-    det.appendChild(sum);
-    det.appendChild(el('p', 'muted small', t('drillIntro')));
+  // The "Note reading" tab of the library.
+  function drillTabEl() {
+    var wrap = el('div', 'lib-pane');
+    wrap.appendChild(el('p', 'muted small lib-intro', t('drillIntro')));
     var ul = el('ul', 'songlist');
     Drills.LEVELS.forEach(function (lv, i) {
       var li = el('li', st.song && st.song.drill === lv.id ? 'current' : '');
@@ -626,7 +622,8 @@
       pick.type = 'button';
       pick.appendChild(el('span', 'name', (i + 1) + '. ' + t(lv.name)));
       var tl = trickyOf(lv.id), names = tl.map(function (e) { return localNoteName(e.name); }).join(', ');
-      pick.appendChild(el('span', 'meta', Drills.describe(lv) + bestLabel({ id: 'drill:' + lv.id }) +
+      var bi = bestInfo({ id: 'drill:' + lv.id });
+      pick.appendChild(el('span', 'meta', Drills.describe(lv) + bi.extra +
         (tl.length ? ' · ' + t('drillTrickyMeta', { list: names }) : '')));
       pick.onclick = function () { startDrill(lv.id); };
       li.appendChild(pick);
@@ -637,10 +634,11 @@
         tb.onclick = function () { startTricky(lv.id); };
         li.appendChild(tb);
       }
+      if (bi.pill) li.appendChild(bi.pill);
       ul.appendChild(li);
     });
-    det.appendChild(ul);
-    return det;
+    wrap.appendChild(ul);
+    return wrap;
   }
 
   // ---------------------------------------------------------------- lessons (js/lessons.js)
@@ -966,14 +964,17 @@
     $('#btnAgain').classList.toggle('primary', !passed);
   }
 
-  // The "Lessons" section of the song list: ○ new, ◐ started, ✓ learnt.
-  function lessonSectionEl() {
-    var det = el('details', 'section lessons');
-    det.open = sectionOpen.lessons != null ? sectionOpen.lessons : isLesson();
-    var sum = el('summary', '', t('lessonSection'));
-    sum.addEventListener('click', function () { sectionOpen.lessons = !det.open; });
-    det.appendChild(sum);
-    det.appendChild(el('p', 'muted small', t('lessonIntro')));
+  // The "Lessons" tab of the library: progress bar + ○ new, ◐ started, ✓ learnt.
+  function lessonTabEl() {
+    var wrap = el('div', 'lib-pane');
+    var doneCount = Lessons.LIST.filter(function (ls) { return Lessons.status(ls, lessonProg[ls.id], best) === 'done'; }).length;
+    var prog = el('div', 'lesson-prog'), bar = el('div', 'lesson-prog-bar'), fill = el('i');
+    fill.style.width = Math.round(100 * doneCount / Lessons.LIST.length) + '%';
+    bar.appendChild(fill);
+    prog.appendChild(bar);
+    prog.appendChild(el('span', 'lesson-prog-txt', t('lessonProgress', { n: doneCount, of: Lessons.LIST.length })));
+    wrap.appendChild(prog);
+    wrap.appendChild(el('p', 'muted small lib-intro', t('lessonIntro')));
     var ul = el('ul', 'songlist');
     Lessons.LIST.forEach(function (ls, i) {
       var li = el('li', st.song && st.song.lesson === ls.id ? 'current' : '');
@@ -992,8 +993,8 @@
       li.appendChild(pick);
       ul.appendChild(li);
     });
-    det.appendChild(ul);
-    return det;
+    wrap.appendChild(ul);
+    return wrap;
   }
 
   // ---------------------------------------------------------------- note input (all sources)
@@ -1963,9 +1964,19 @@
     return e;
   }
 
-  // Best scores in the song list: "best 96%" when only both hands were practised, otherwise per hand
-  // ("best: both 96% · right 90%"), so practising one hand also shows progress.
-  function bestLabel(s) {
+  // Non-blocking toast notification for informational feedback (link copied, backup notices).
+  var toastTimer = 0;
+  function showToast(msg) {
+    var box = $('#toast');
+    box.textContent = msg;
+    box.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { box.hidden = true; }, 3200);
+  }
+
+  // Best scores for a song or drill: a compact right-aligned pill for the headline score, plus
+  // any extra breakdown (other hands / play-along speed) in the subtitle.
+  function bestInfo(s) {
     var parts = [];
     [['B', 'both'], ['R', 'right'], ['L', 'left']].forEach(function (h) {
       var p = best[s.id + ':' + h[0]];
@@ -1979,11 +1990,20 @@
       var c = { speed: +m[2], p: best[k], both: m[1] === 'B' };
       if (!top || c.speed > top.speed || (c.speed === top.speed && (c.both > top.both || (c.both === top.both && c.p > top.p)))) top = c;
     });
-    var tempoTxt = top ? t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p }) : '';
-    if (!parts.length) return tempoTxt ? ' · ' + tempoTxt : '';
-    var txt = parts.length === 1 && parts[0].h === 'B' ? t('metaBest', { p: parts[0].p })
-      : t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') });
-    return ' · ' + txt + (tempoTxt ? ' · ' + tempoTxt : '');
+    var pill = null, extra = [];
+    var main = parts.filter(function (x) { return x.h === 'B'; })[0] || parts[0];
+    if (main) {
+      pill = el('span', 'score-pill' + (main.p >= 100 ? ' perfect' : ''), t('metaPct', { p: main.p }));
+      pill.title = t('metaBest', { p: main.p });
+      if (parts.length > 1 || main.h !== 'B') {
+        extra.push(t('metaBestHands', { list: parts.map(function (x) { return x.txt; }).join(', ') }));
+      }
+    } else if (top) {
+      pill = el('span', 'score-pill' + (top.p >= 100 ? ' perfect' : ''), t('metaPct', { p: top.p }));
+      pill.title = t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p });
+    }
+    if (top) extra.push(t('metaTempoBest', { speed: t('tempoPct', { p: top.speed }), p: top.p }));
+    return { pill: pill, extra: extra.length ? ' · ' + extra.join(' · ') : '' };
   }
 
   // Starter songs: built-in songs the user hasn't changed. Once there are own songs, they are
@@ -1992,6 +2012,35 @@
     return s.kind === 'text' && BUILTIN.some(function (b) { return b.title === s.title && b.text === s.text; });
   }
   var sectionOpen = {};   // section -> opened/closed by the user (this visit only)
+  var libTab = 'songs';   // 'songs' | 'lessons' | 'drills'
+
+  function setLibTab(tab) {
+    libTab = tab;
+    document.querySelectorAll('#libTabs button').forEach(function (b) {
+      var on = b.getAttribute('data-tab') === tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    renderLibrary();
+  }
+  function openLibrary() {
+    libTab = isLesson() ? 'lessons' : isDrill() ? 'drills' : 'songs';
+    if ($('#songSearch')) $('#songSearch').value = '';
+    setLibTab(libTab);
+    openModal('mLibrary');
+  }
+  document.querySelectorAll('#libTabs button').forEach(function (b) {
+    b.addEventListener('click', function () { setLibTab(b.getAttribute('data-tab')); });
+  });
+  $('#songSearch').addEventListener('input', renderLibrary);
+
+  function updateLibBadges() {
+    var done = Lessons.LIST.filter(function (ls) { return Lessons.status(ls, lessonProg[ls.id], best) === 'done'; }).length;
+    $('#tabLessonsBadge').textContent = done ? done + '/' + Lessons.LIST.length : '';
+    var trickyCount = 0;
+    Drills.LEVELS.forEach(function (lv) { trickyCount += trickyOf(lv.id).length; });
+    $('#tabDrillsBadge').textContent = trickyCount ? String(trickyCount) : '';
+  }
 
   // Tap a song to practise it; ⋯ opens its other actions. Most recently played or added first.
   // Songs without a group come first, then one foldable section per group (book, lesson, ...),
@@ -1999,11 +2048,27 @@
   function renderLibrary() {
     var box = $('#songList');
     box.innerHTML = '';
-    $('#libHint').hidden = !songs.length;
-    box.appendChild(drillSectionEl());
-    box.appendChild(lessonSectionEl());
+    updateLibBadges();
+    var onSongs = libTab === 'songs';
+    $('#libSongTools').hidden = !onSongs;
+    $('#libBackup').hidden = !onSongs;
+    $('#libHint').hidden = !onSongs || !songs.length;
+    if (libTab === 'lessons') { box.appendChild(lessonTabEl()); return; }
+    if (libTab === 'drills') { box.appendChild(drillTabEl()); return; }
+
+    var searchEl = $('#songSearch');
+    searchEl.hidden = songs.length <= 8;
+    var q = searchEl.hidden ? '' : searchEl.value.trim().toLowerCase();
     if (!songs.length) { box.appendChild(el('p', 'muted', t('noSongs'))); return; }
     var ordered = songs.slice().sort(function (a, b) { return (b.recent || 0) - (a.recent || 0); });
+    if (q) {
+      var hits = ordered.filter(function (s) {
+        return songName(s).toLowerCase().indexOf(q) >= 0 || (s.group && s.group.toLowerCase().indexOf(q) >= 0);
+      });
+      if (!hits.length) { box.appendChild(el('p', 'muted', t('libNoMatch'))); return; }
+      box.appendChild(songListEl(hits, true));
+      return;
+    }
     var loose = [], starters = [], groups = [], byName = {};
     ordered.forEach(function (s) {
       if (s.group) {
@@ -2054,23 +2119,26 @@
     });
   }
 
-  function songListEl(list) {
+  function songListEl(list, showGroup) {
     var ul = el('ul', 'songlist');
     list.forEach(function (s) {
       var li = el('li', st.song && st.song.id === s.id ? 'current' : '');
       var pick = el('button', 'pick');
       pick.type = 'button';
       pick.appendChild(el('span', 'name', songName(s)));
-      var nSteps = buildSteps(s.notes, 'B').length;
-      pick.appendChild(el('span', 'meta', t(nSteps === 1 ? 'metaStep1' : 'metaSteps', { n: nSteps }) + ' · ' +
-        handsLabel(s.notes) + ' · ' + t(s.kind === 'midi' ? 'metaMidi' : 'metaTyped') + bestLabel(s)));
+      var nSteps = buildSteps(s.notes, 'B').length, bi = bestInfo(s);
+      var meta = t(nSteps === 1 ? 'metaStep1' : 'metaSteps', { n: nSteps }) + ' · ' + handsLabel(s.notes) +
+        (s.kind === 'midi' ? ' · ' + t('metaMidi') : '') + (showGroup && s.group ? ' · ' + s.group : '') + bi.extra;
+      pick.appendChild(el('span', 'meta', meta));
       pick.onclick = function () { closeAll(); loadSong(s); };
       var more = el('button', 'btn icon more', '⋯');
       more.type = 'button';
       more.title = t('moreActions');
       more.setAttribute('aria-label', t('moreActionsFor', { t: songName(s) }));
       more.onclick = function () { openSongActions(s); };
-      li.appendChild(pick); li.appendChild(more);
+      li.appendChild(pick);
+      if (bi.pill) li.appendChild(bi.pill);
+      li.appendChild(more);
       ul.appendChild(li);
     });
     return ul;
@@ -2146,7 +2214,7 @@
     if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () { /* cancelled */ }); return; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
-        alert(t('linkCopied', { what: what }));
+        showToast(t('linkCopied', { what: what }));
       }, function () { prompt(t('copyLink'), url); });
       return;
     }
@@ -2234,7 +2302,7 @@
         return null;
       }
     } else if (fromBackup) {
-      alert(t('backupSame'));
+      showToast(t('backupSame'));
     }
     same.concat(toUpdate, toAdd).forEach(mergeBest);
     store.set('pliktra.best', best);
@@ -2263,7 +2331,7 @@
   // ---- all songs: share link (typed songs), backup file (everything, with best scores), restore
   $('#btnShareAll').onclick = function () {
     var typed = songs.filter(function (s) { return s.kind !== 'midi'; });
-    if (!typed.length) { alert(t('noTypedSongs')); return; }
+    if (!typed.length) { showToast(t('noTypedSongs')); return; }
     shareLink(typed.map(function (s) { return songEntry(s, false); }), t('allSongsTitle'),
       typed.length === 1 ? t('quote', { t: songName(typed[0]) }) : t('theseSongs', { n: typed.length }));
   };
@@ -2454,7 +2522,7 @@
   });
 
   // ---------------------------------------------------------------- top bar wiring
-  $('#btnSongs').onclick = function () { renderLibrary(); openModal('mLibrary'); };
+  $('#btnSongs').onclick = openLibrary;
   $('#btnSettings').onclick = function () { openModal('mSettings'); };
   $('#btnRestart').onclick = function () { restart(loopOn() ? loop.a : 0); };
 
@@ -2543,7 +2611,7 @@
     if (i + 1 < l.steps.length) openLessonCard(l.id, i + 1);
     else if (n) openLessonCard(n.id, 0);
   };
-  $('#btnResSongs').onclick = function () { closeModal('mResult'); renderLibrary(); openModal('mLibrary'); };
+  $('#btnResSongs').onclick = function () { closeModal('mResult'); openLibrary(); };
   $('#progress').addEventListener('input', function (e) { restart(parseInt(e.target.value, 10) || 0); });
   // Don't leave the practice bar focused: Space/Enter would press the last button again.
   $('.practicebar').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) b.blur(); });
