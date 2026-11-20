@@ -141,6 +141,7 @@
   };
   var held = {};   // midi -> number of sources holding it
   var wrong = {};  // midi -> time of the last wrong press (for the red flash)
+  var timed = {};  // play along: midi -> { grade: 'ok' | 'early' | 'late', at } (green / amber flash on the key)
   var dirty = true;
 
   // A–B loop: tap Loop at the first step of a hard part, move the slider (or play on) to its
@@ -539,6 +540,7 @@
       '<div class="result-lines">' + lines + '</div>' +
       (lessonStep() ? '' : '<div class="result-note' + (isBest ? ' best' : '') + '">' + note + '</div>');
     var watch = drillWatch();
+    if (isDrill() && full) updateTricky(watch);
     if (isDrill()) {
       var wl = el('div', 'result-note watch', watch.length ? t('drillWatch', { list: watch.map(function (w) { return localNoteName(w.name); }).join(', ') }) : t('drillAllRight'));
       $('#resBody').appendChild(wl);
@@ -575,6 +577,37 @@
       return { name: n && n.s ? n.s : midiToName(m), hand: st.missed[m] };
     });
   }
+  // Tricky notes, kept per level: pliktra.tricky = { <level id>: [{ name, hand, key, left }] } (js/drills.js).
+  var tricky = store.get('pliktra.tricky', {});
+  if (!tricky || typeof tricky !== 'object') tricky = {};
+  function trickyOf(id) { return Array.isArray(tricky[id]) ? tricky[id] : []; }
+  // After a whole round: notes read wrong join the list, notes read right count towards leaving it.
+  function updateTricky(watch) {
+    var id = st.song.drill, nm = function (n) { return { name: n.s || midiToName(n.m), hand: n.h }; };
+    tricky[id] = Drills.updateTricky(trickyOf(id), st.song.notes.map(nm), watch, parseSongText(st.song.text).key);
+    if (!tricky[id].length) delete tricky[id];
+    store.set('pliktra.tricky', tricky);
+  }
+  // From a backup: tricky notes not here yet are added.
+  function mergeTricky(src) {
+    if (!src || typeof src !== 'object') return;
+    Drills.LEVELS.forEach(function (lv) {
+      if (!Array.isArray(src[lv.id])) return;
+      var list = trickyOf(lv.id).slice();
+      src[lv.id].forEach(function (e) {
+        if (!e || typeof e.name !== 'string' || parseNoteName(e.name) == null || (e.hand !== 'R' && e.hand !== 'L')) return;
+        if (list.some(function (x) { return x.name === e.name && x.hand === e.hand; })) return;
+        list.push({ name: e.name, hand: e.hand, key: typeof e.key === 'string' && parseKey(e.key) != null ? e.key : 'C',
+          left: Math.max(1, Math.min(Drills.TRICKY_ROUNDS, +e.left || Drills.TRICKY_ROUNDS)) });
+      });
+      if (list.length) tricky[lv.id] = list.slice(-12);
+    });
+    store.set('pliktra.tricky', tricky);
+  }
+  function startTricky(id) {
+    var r = Drills.trickyRound(trickyOf(id));
+    if (r) startDrill(id, r.focus, r.key);
+  }
   // The "Note reading" section of the song list.
   function drillSectionEl() {
     var det = el('details', 'section drills');
@@ -589,9 +622,18 @@
       var pick = el('button', 'pick');
       pick.type = 'button';
       pick.appendChild(el('span', 'name', (i + 1) + '. ' + t(lv.name)));
-      pick.appendChild(el('span', 'meta', Drills.describe(lv) + bestLabel({ id: 'drill:' + lv.id })));
+      var tl = trickyOf(lv.id), names = tl.map(function (e) { return localNoteName(e.name); }).join(', ');
+      pick.appendChild(el('span', 'meta', Drills.describe(lv) + bestLabel({ id: 'drill:' + lv.id }) +
+        (tl.length ? ' · ' + t('drillTrickyMeta', { list: names }) : '')));
       pick.onclick = function () { startDrill(lv.id); };
       li.appendChild(pick);
+      if (tl.length) {   // one tap: a round full of the notes read wrong before
+        var tb = el('button', 'btn small tricky', t('drillTricky', { n: tl.length }));
+        tb.type = 'button';
+        tb.title = t('drillTrickyTitle', { list: names });
+        tb.onclick = function () { startTricky(lv.id); };
+        li.appendChild(tb);
+      }
       ul.appendChild(li);
     });
     det.appendChild(ul);
@@ -1251,6 +1293,7 @@
     if (j) {
       j.target.res = j.grade;
       p[j.grade]++;
+      timed[m] = { grade: j.grade, at: now };
       if ((p.stepT[p.si] || []).indexOf(j.target) >= 0) st.hits[m] = true;
       if (j.grade !== 'ok') {   // "early" / "late" for a moment
         p.flash = t(j.grade === 'early' ? 'tempoEarly' : 'tempoLate');
@@ -1509,8 +1552,11 @@
     drawKeyboard(now, step);
   }
 
+  var TIMED_MS = 450;   // how long a played key shows its timing colour
   function keyState(m, now, step) {
     if (wrong[m] && now - wrong[m] < 380) return { fill: '#f25f5c', deep: '#c73a37', strong: true };
+    var tm = timed[m];   // play along: in time = green, a bit early / late = amber
+    if (tm && now - tm.at < TIMED_MS) return tm.grade === 'ok' ? { fill: '#34c785', deep: '#1f9a62', strong: true } : { fill: '#f5b445', deep: '#c98a1c', strong: true };
     if (demoKeys[m]) return { fill: HAND_COLOR[demoKeys[m]], deep: HAND_DEEP[demoKeys[m]], strong: true, hand: demoKeys[m] };   // sounding in Listen
     if (explainKeys[m]) return { fill: HAND_COLOR[explainKeys[m]], deep: HAND_DEEP[explainKeys[m]], strong: true, hand: explainKeys[m] };   // tapped in the score
     if (step && !anyModalOpen() && step.notes.indexOf(m) >= 0 && (keyHintsOn() || st.hits[m])) {
@@ -1680,6 +1726,10 @@
     }
     for (var m in wrong) {
       if (now - wrong[m] > 400) delete wrong[m];
+      dirty = true;
+    }
+    for (var k in timed) {
+      if (now - timed[k].at > TIMED_MS + 20) delete timed[k];
       dirty = true;
     }
     if (dirty && geo) { dirty = false; draw(now); }
@@ -2108,7 +2158,7 @@
   };
   $('#btnBackup').onclick = function () {
     var data = { app: 'pliktra', version: 1, saved: new Date().toISOString(), songs: songs.map(function (s) { return songEntry(s, true); }),
-      lessons: lessonProg };   // lesson progress (older backups don't have it)
+      lessons: lessonProg, tricky: tricky };   // lesson progress, tricky notes (older backups don't have them)
     var a = el('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     a.download = 'pliktra-songs-' + new Date().toISOString().slice(0, 10) + '.json';
@@ -2124,7 +2174,7 @@
       try { data = JSON.parse(txt); } catch (err) { /* handled below */ }
       var playing = st.song, oldNotes = playing && playing.notes;
       importSongs(data && data.app === 'pliktra' ? data.songs : null, t('backupDamaged'), true);
-      if (data && data.app === 'pliktra') mergeLessonProg(data.lessons);
+      if (data && data.app === 'pliktra') { mergeLessonProg(data.lessons); mergeTricky(data.tricky); }
       if (playing && playing.notes !== oldNotes) loadSong(playing);   // the song being practised was updated
       renderLibrary();
     });

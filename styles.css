@@ -705,6 +705,8 @@ textarea {
   color: var(--text);
 }
 
+.songlist .tricky { flex: none; margin-right: 4px; color: #f5b445; border-color: rgba(245, 180, 69, 0.45); }
+
 /* collapsible song groups & starter songs */
 .section {
   margin-top: 10px;

@@ -62,7 +62,9 @@ and **restore** it later or on another device.
 - **Note reading** (Songs → *Note reading*): 8 levels of endless drills, from the landmark notes (C3, F3,
   middle C, G4, C5) to both staves, ledger lines and key signatures. Every round is 16 fresh notes, so it
   can't be learnt by heart; it always uses the sheet music and reading mode. The result lists the notes you
-  missed, and *Practise these notes* makes a round with more of them.
+  missed, and *Practise these notes* makes a round with more of them. Missed notes are also kept as
+  *tricky notes* for each level, until you have read each one right in two rounds; the level's
+  *Tricky notes* button in the list starts a round full of them.
 - **Lessons** (Songs → *Lessons*): eight short lessons, one skill each: finding your way on the keyboard,
   the five-finger position, holding notes, loud and soft, alternating hands, thumb under, the scale in
   contrary motion, and major and minor chords. Each lesson is a row of small steps:
@@ -89,7 +91,9 @@ and **restore** it later or on another device.
 - **Tempo (play along)**: choose 40, 60, 80 or 100% of the speed. Press any key for a one-bar count-in; then
   the music runs on and doesn't wait. Every note counts as in time, a bit early or late, or missed; the result
   shows a timing score, with a best score per speed. Optional metronome; when you practise one hand, the app
-  can play the other one. With a loop, each round shows its score. *Off (wait)* is the usual wait mode.
+  can play the other one. Each key you play flashes green (in time) or amber (a bit early or late). With a
+  loop, each round shows its score; the song list shows your best score at the fastest speed played.
+  *Off (wait)* is the usual wait mode.
 
 ## Languages
 

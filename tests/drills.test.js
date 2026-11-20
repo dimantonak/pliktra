@@ -84,3 +84,29 @@ test('a focus round of the key signature level keeps the round’s key', () => {
     assert.deepEqual(offKeyNotes(parseSongText(text).notes, 'G'), [], 'no ♯/♭ against the key: ' + text);
   }
 });
+
+test('tricky notes: read wrong -> kept; read right in two rounds -> gone', () => {
+  const f4 = { name: 'F#4', hand: 'R' }, b3 = { name: 'B3', hand: 'L' }, c4 = { name: 'C4', hand: 'R' };
+  let list = Drills.updateTricky([], [f4, c4], [f4], 'G');
+  assert.deepEqual(list, [{ name: 'F#4', hand: 'R', key: 'G', left: 2 }]);
+  list = Drills.updateTricky(list, [c4], [], 'G');              // not in the round: unchanged
+  assert.equal(list[0].left, 2);
+  list = Drills.updateTricky(list, [f4, c4], [b3], 'G');        // F#4 right once, B3 wrong
+  assert.deepEqual(list.map(e => [e.name, e.left]), [['F#4', 1], ['B3', 2]]);
+  list = Drills.updateTricky(list, [f4], [f4], 'G');            // wrong again: back to 2
+  assert.equal(list[0].left, 2);
+  list = Drills.updateTricky(list, [f4, b3], [], 'G');
+  list = Drills.updateTricky(list, [f4, b3], [], 'G');
+  assert.deepEqual(list, []);
+  const many = Drills.updateTricky([], [], [...Array(20)].map((_, i) => ({ name: 'N' + i, hand: 'R' })), 'C');
+  assert.equal(many.length, 12);
+});
+
+test('a tricky-notes round uses one key signature', () => {
+  const r = Drills.trickyRound([{ name: 'F#4', hand: 'R', key: 'G', left: 2 }, { name: 'Bb4', hand: 'R', key: 'F', left: 2 }, { name: 'F#5', hand: 'R', key: 'G', left: 1 }]);
+  assert.equal(r.key, 'G');
+  assert.deepEqual(r.focus.map(n => n.name), ['F#4', 'F#5']);
+  assert.equal(Drills.trickyRound([]), null);
+  const text = Drills.generate('keys', { focus: r.focus, key: r.key, random: seeded(3) });
+  assert.ok(parseSongText(text).notes.some(n => n.m === parseNoteName('F#4') || n.m === parseNoteName('F#5')), text);
+});

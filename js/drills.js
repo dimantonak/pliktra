@@ -107,6 +107,33 @@ var Drills = (function () {
     return (key !== 'C' ? 'key:' + key + ' ' : '') + words.join(' ');
   }
 
+  // Tricky notes: notes read wrong, kept (per level) until each was read right in TRICKY_ROUNDS rounds.
+  // list: [{ name, hand, key, left }], round: the round's notes [{ name, hand }], missed: [{ name, hand }]
+  // read wrong in it, key: the round's key signature. -> the new list (the most recent last, at most 12).
+  var TRICKY_ROUNDS = 2;
+  function updateTricky(list, round, missed, key) {
+    var id = function (n) { return n.name + '|' + n.hand; };
+    var inRound = {}, wrong = {};
+    round.forEach(function (n) { inRound[id(n)] = true; });
+    missed.forEach(function (n) { wrong[id(n)] = true; });
+    var out = (list || []).map(function (e) {
+      var c = { name: e.name, hand: e.hand, key: e.key || 'C', left: e.left };
+      if (wrong[id(c)]) { c.left = TRICKY_ROUNDS; c.key = key; }
+      else if (inRound[id(c)]) c.left--;
+      return c;
+    }).filter(function (e) { return e.left > 0; });
+    missed.forEach(function (n) {
+      if (!out.some(function (e) { return id(e) === id(n); })) out.push({ name: n.name, hand: n.hand, key: key, left: TRICKY_ROUNDS });
+    });
+    return out.slice(-12);
+  }
+  // A round for the tricky notes: { key, focus } (one key signature per round: the first note's).
+  function trickyRound(list) {
+    if (!list || !list.length) return null;
+    var key = list[0].key || 'C';
+    return { key: key, focus: list.filter(function (e) { return (e.key || 'C') === key; }).map(function (e) { return { name: e.name, hand: e.hand }; }) };
+  }
+
   // A level's description for the list, e.g. "C4 to G4" (note names in the app's language).
   function describe(lv) {
     function rangeText(spec) { return t('drillRange', { a: localNoteName(spec.range[0]), b: localNoteName(spec.range[1]) }); }
@@ -117,7 +144,8 @@ var Drills = (function () {
     return rangeText(lv.R || lv.L);
   }
 
-  return { LEVELS: LEVELS, ROUND: ROUND, level: level, notes: notes, generate: generate, describe: describe };
+  return { LEVELS: LEVELS, ROUND: ROUND, TRICKY_ROUNDS: TRICKY_ROUNDS, level: level, notes: notes, generate: generate, describe: describe,
+    updateTricky: updateTricky, trickyRound: trickyRound };
 })();
 
 if (typeof module !== 'undefined') module.exports = { Drills: Drills };
