@@ -57,6 +57,11 @@ another device.
   the scale in contrary motion, major and minor chords, and the sustain pedal. Each lesson is a row of small steps:
   - *cards* explain the skill, with a keyboard picture (the keys you press light up in it; without a piano
     you can tap its keys) and *Listen*; some ask you to find keys on your piano (e.g. every C);
+  - the cards about timing show *Listen* as an animation: a timeline with the note values and the count
+    (counting, holding notes), how strongly each note is struck (loud and soft), and for legato and the pedal
+    the right way next to the wrong ones (joined / with gaps / held too long; pedal changed just after the
+    chord / lifted too early / never lifted), each to hear and see. On a piano connected by USB the example is
+    played on the piano itself, with its loudness and the pedal;
   - *play steps* are short pieces, from a few notes to a little piece at the end. A step is passed at 80%
     right first time, plus its own check:
     - *holding notes*: long notes held to the end (the app notices a key let go too early);

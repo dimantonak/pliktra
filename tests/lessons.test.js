@@ -204,3 +204,62 @@ test('counting steps play along at a speed the app offers', () => {
   for (const ls of Lessons.LIST) for (const s of ls.steps) if (s.tempo) assert.ok(Tempo.SPEEDS.includes(s.tempo), ls.id + '/' + s.id);
   assert.ok(Lessons.get('count').steps.filter(s => s.tempo).length >= 3);
 });
+
+test('lesson demos: every version has a name and a caption, and a picture to light up', () => {
+  for (const ls of Lessons.LIST) for (const s of ls.steps) {
+    if (!s.demo) continue;
+    assert.ok(s.listen && s.type === 'learn' && s.pic, ls.id + '/' + s.id);
+    assert.ok(['count', 'vel', 'legato', 'pedal'].includes(s.demo.tl), ls.id + '/' + s.id);
+    for (const v of s.demo.vars || []) for (const k of ['demo' + v.id[0].toUpperCase() + v.id.slice(1), 'demo' + v.id[0].toUpperCase() + v.id.slice(1) + 'X']) {
+      for (const lang of Object.keys(L.LANGS)) assert.ok(L.I18N[lang][k], lang + ': ' + k);
+    }
+  }
+  assert.ok(Lessons.LIST.reduce((n, ls) => n + ls.steps.filter(s => s.demo).length, 0) >= 9);
+});
+
+const stepOf = (l, s) => Lessons.get(l).steps.find(x => x.id === s);
+
+test('legato demo: joined, with gaps, held too long', () => {
+  const s = stepOf('legato', 'smooth');
+  const pairs = v => { const n = Lessons.demoPlan(s, v, 1).notes; return n.slice(0, -1).map((a, i) => a.off - n[i + 1].on); };
+  assert.ok(pairs('joined').every(d => d >= 0 && d < 0.05), 'joined: up as the next goes down');
+  assert.ok(pairs('gap').every(d => d < -0.1), 'gaps');
+  assert.ok(pairs('blur').every(d => d > 0.2), 'held over');
+});
+
+test('pedal demo: the sound of each chord with the three pedal versions', () => {
+  const s = stepOf('pedal', 'change');
+  const chords = v => { const p = Lessons.demoPlan(s, v, 1), on = [...new Set(p.notes.map(n => n.on))];
+    return on.map(t => ({ on: t, snd: Math.max(...p.notes.filter(n => n.on === t).map(n => n.snd)), off: Math.max(...p.notes.filter(n => n.on === t).map(n => n.off)) })); };
+  for (const v of ['clean', 'early', 'never']) assert.ok(chords(v).slice(0, -1).every((c, i, a) => c.off < chords(v)[i + 1].on), v + ': the hands leave before the next chord');
+  assert.ok(chords('clean').slice(0, -1).every((c, i) => { const nx = chords('clean')[i + 1].on; return c.snd >= nx && c.snd < nx + 0.12; }), 'clean: sounds up to the new chord, no blur');
+  assert.ok(chords('early').slice(0, -1).every((c, i) => c.snd < chords('early')[i + 1].on - 0.2), 'early: a gap');
+  assert.ok(chords('never').every(c => c.snd >= 3.5), 'never lifted: everything rings on');
+  const svg = v => Lessons.timelineSvg(Lessons.demoPlan(s, v, 1), { keys: 'k', sound: 's', pedal: 'p' });
+  assert.ok(/class="clash"/.test(svg('never')) && !/class="clash"/.test(svg('clean')) && !/class="clash"/.test(svg('early')));
+  const w = Lessons.demoPlan(stepOf('pedal', 'what'), 'with', 1), wo = Lessons.demoPlan(stepOf('pedal', 'what'), 'without', 1);
+  assert.ok(w.notes[0].snd > w.notes[0].off + 1 && wo.notes[0].snd === wo.notes[0].off, 'with the pedal the chord rings on');
+  assert.ok(w.pedal[0].at < w.notes[0].on, 'the foot goes down first');
+});
+
+test('loud and soft demo: velocities', () => {
+  const pf = Lessons.demoPlan(stepOf('dynamics', 'pf'), null, 1).notes.map(n => n.v);
+  assert.ok(pf.slice(0, 4).every(v => v < 50) && pf.slice(4).every(v => v > 100), pf.join(' '));
+  const cr = Lessons.demoPlan(stepOf('dynamics', 'cresc'), null, 1).notes.map(n => n.v);
+  assert.ok(cr.every((v, i) => i === 0 || v > cr[i - 1]) && cr[0] < 40 && cr[cr.length - 1] > 100, cr.join(' '));
+});
+
+test('counting demos: note values as in the sheet music, rests, a click on every beat', () => {
+  const h = Lessons.demoPlan(stepOf('hold', 'halves'), null, 1);
+  assert.deepEqual([...new Set(h.notes.filter(n => n.h === 'L').map(n => n.beats))], [2], 'left hand: half notes');
+  assert.deepEqual([...new Set(h.notes.filter(n => n.h === 'R').map(n => n.beats))], [1]);
+  assert.equal(h.rests.length, 0);
+  const l = Lessons.demoPlan(stepOf('count', 'lengths'), null, 1);
+  assert.deepEqual(l.notes.map(n => n.beats), [2, 2, 1, 1, 4]);
+  assert.deepEqual(l.rests.map(r => r.beats), [1, 1]);
+  assert.equal(l.clicks.length, 12);
+  assert.ok(Math.abs(l.beat - 0.5 / 0.6) < 1e-9, 'played at the step speed');
+  const svg = Lessons.timelineSvg(l, {});
+  assert.equal((svg.match(/class="tn /g) || []).length, 5);
+  assert.equal((svg.match(/class="tc/g) || []).length, 12);
+});

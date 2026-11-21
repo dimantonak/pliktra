@@ -7,6 +7,7 @@
 //          legato: 'R' / 'L' / 'B'  each note joined to the next one (no gap, no long overlap)
 //          pedal: 'bar'  the sustain pedal changed with each bar's chord (legato pedalling)
 //          tempo: 0.6  played along at that speed with the metronome (timing score) instead of wait mode
+// A learn card with `demo` draws its Listen example on a timeline (see demoPlan).
 // Texts are i18n keys: lx_<lesson>_<step>_t (title), _x (text), _h (hint while playing, play steps).
 // A lesson is learnt when every play step is passed (and was, before lessons had steps, with 95%+).
 // A lesson "song" (id "lesson:<id>") is never stored. Uses notation.js.
@@ -42,22 +43,22 @@ var Lessons = (function () {
         text: 'C3/5+C4/1 D3/4+D4/2 E3/3+E4/3 F3/2+F4/4 | G3/1+G4/5 F3/2+F4/4 E3/3+E4/3 D3/4+D4/2 | C3/5+C4/1_4' }
     ] },
     { id: 'count', name: 'lessonCount', desc: 'lessonCountDesc', steps: [
-      { id: 'beat', type: 'learn', listen: 'C4 C4 C4 C4 | D4 D4 D4 D4 | E4 E4 D4 D4 | C4_4' },
-      { id: 'quarters', type: 'play', tempo: 0.6,
+      { id: 'beat', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 C4 C4 C4 | D4 D4 E4 E4 | C4_4', demo: { tl: 'count', tempo: 0.6 } },
+      { id: 'quarters', type: 'play', tempo: 0.4,
         text: 'C4/1 C4/1 C4/1 C4/1 | D4/2 D4/2 D4/2 D4/2 | E4/3 E4/3 D4/2 D4/2 | C4/1 C4/1 C4/1 C4/1' },
-      { id: 'lengths', type: 'learn', listen: 'C4_2 D4_2 | E4_2 C4_2 | E4 F4 G4_2 | C4_4' },
-      { id: 'long', type: 'play', tempo: 0.6, text: 'C4/1_2 D4/2_2 | E4/3_2 C4/1_2 | E4/3 F4/4 G4/5_2 | C4/1_4' },
-      { id: 'rests', type: 'play', tempo: 0.6, text: 'C4/1 - C4/1 - | E4/3 - E4/3 - | G4/5 G4/5 - G4/5 | C4/1_2 -_2' },
+      { id: 'lengths', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4_2 D4_2 | E4 - E4 - | C4_4', demo: { tl: 'count', tempo: 0.6 } },
+      { id: 'long', type: 'play', tempo: 0.4, text: 'C4/1_2 D4/2_2 | E4/3_2 C4/1_2 | E4/3 F4/4 G4/5_2 | C4/1_4' },
+      { id: 'rests', type: 'play', tempo: 0.4, text: 'C4/1 - C4/1 - | E4/3 - E4/3 - | G4/5 G4/5 - G4/5 | C4/1_2 -_2' },
       { id: 'tune', type: 'play', tempo: 0.6,
         // "Au clair de la lune" (French folk song, traditional)
         text: 'C4/1 C4/1 C4/1 D4/2 | E4/3_2 D4/2_2 | C4/1 E4/3 D4/2 D4/2 | C4/1_4 |\n' +
               'C4/1 C4/1 C4/1 D4/2 | E4/3_2 D4/2_2 | C4/1 E4/3 D4/2 D4/2 | C4/1_4' }
     ] },
     { id: 'hold', name: 'lessonHold', desc: 'lessonHoldDesc', steps: [
-      { id: 'long', type: 'learn', listen: 'C4_4 | E4_2 G4_2 | C4 D4 E4 F4 | G4_4' },
+      { id: 'long', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4_4 | E4_2 G4_2 | C4 D4 E4 F4 | G4_4', demo: { tl: 'count', tempo: 0.8 } },
       { id: 'whole', type: 'play', hold: 'L',
         text: 'C3/5+C4/1 D4/2 E4/3 F4/4 | G3/1+G4/5 F4/4 E4/3 D4/2 | C3/5+C4/1 D4/2 E4/3 F4/4 | G3/1+G4/5_4' },
-      { id: 'halves', type: 'learn' },
+      { id: 'halves', type: 'learn', pic: { from: 'C3', to: 'C5' }, listen: 'C3+E4 D4 E3+C4 D4 | F3+F4 E4 E3+G4 E4', demo: { tl: 'count', tempo: 0.8 } },
       { id: 'half', type: 'play', hold: 'L',
         text: 'C3/5+E4/3 D4/2 E3/3+C4/1 D4/2 | F3/2+F4/4 E4/3 E3/3+G4/5 E4/3 | D3/4+D4/2 F4/4 G3/1+G4/5 F4/4 | C3/5+E4/3 D4/2 C4/1_2' },
       { id: 'piece', type: 'play', hold: 'L',
@@ -65,19 +66,20 @@ var Lessons = (function () {
               'C3/5+E4/3 D4/2 E3/3+C4/1 D4/2 | F3/2+F4/4 E4/3 E3/3+G4/5 E4/3 | D3/4+D4/2 F4/4 G3/1+G4/5 F4/4 | C3/5+E4/3 D4/2 C4/1_2' }
     ] },
     { id: 'dynamics', name: 'lessonDyn', desc: 'lessonDynDesc', steps: [
-      { id: 'pf', type: 'learn' },
+      { id: 'pf', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 E4 G4 E4 | C4 E4 G4 E4 | C4_4', demo: { tl: 'vel', dyn: ['p', 'f', 'f'] } },
       { id: 'softloud', type: 'play', dyn: ['p', 'p', 'f', 'f'],
         text: 'C4/1 D4/2 E4/3 F4/4 | G4/5_4 | C4/1 D4/2 E4/3 F4/4 | G4/5_4' },
       { id: 'echo', type: 'play', dyn: ['f', 'f', 'p', 'p', 'f', 'f', 'p', 'p'],
         // "Hänschen klein" (German folk song, traditional)
         text: 'G4/5 E4/3 E4/3_2 | F4/4 D4/2 D4/2_2 | G4/5 E4/3 E4/3_2 | F4/4 D4/2 D4/2_2 |\n' +
               'C4/1 D4/2 E4/3 F4/4 | G4/5 G4/5 G4/5_2 | C4/1 D4/2 E4/3 F4/4 | G4/5 G4/5 G4/5_2' },
-      { id: 'cresc', type: 'learn' },
+      { id: 'cresc', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 D4 E4 F4 | G4 F4 E4 D4 | C4 D4 E4 F4 | G4_4', demo: { tl: 'vel', dyn: 'cresc' } },
       { id: 'louder', type: 'play', dyn: 'cresc',
         text: 'C4/1 D4/2 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1 D4/2 E4/3 F4/4 | G4/5_4' }
     ] },
     { id: 'legato', name: 'lessonLegato', desc: 'lessonLegatoDesc', steps: [
-      { id: 'smooth', type: 'learn', listen: 'C4 D4 E4 F4 | G4 F4 E4 D4 | C4_4' },
+      { id: 'smooth', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 D4 E4 F4 | G4 F4 E4 D4 | C4_4',
+        demo: { tl: 'legato', vars: [{ id: 'joined', legato: 'joined' }, { id: 'gap', legato: 'gap' }, { id: 'blur', legato: 'blur' }] } },
       { id: 'pairs', type: 'play', legato: 'R', text: 'C4/1 D4/2 C4/1 D4/2 | E4/3 F4/4 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1_4' },
       { id: 'line', type: 'play', legato: 'R', text: 'C4/1 D4/2 E4/3 F4/4 | G4/5 F4/4 E4/3 D4/2 | C4/1 E4/3 D4/2 F4/4 | E4/3 D4/2 C4/1_2' },
       { id: 'left', type: 'play', legato: 'L', text: 'C3/5 D3/4 E3/3 F3/2 | G3/1 F3/2 E3/3 D3/4 | C3/5 E3/3 D3/4 F3/2 | E3/3 D3/4 C3/5_2' },
@@ -131,8 +133,10 @@ var Lessons = (function () {
               'C3/5+E3/3+G3/1+C4/1+E4/3+G4/5_2 C3/5+Eb3/3+G3/1+C4/1+Eb4/3+G4/5_2 | C3/5+E3/3+G3/1+C4/1+E4/3+G4/5_4' }
     ] },
     { id: 'pedal', name: 'lessonPedal', desc: 'lessonPedalDesc', steps: [
-      { id: 'what', type: 'learn', showPedal: true },
-      { id: 'change', type: 'learn', showPedal: true, listen: 'C4+E4+G4_4 | C4+F4+A4_4' },
+      { id: 'what', type: 'learn', showPedal: true, pic: { from: 'A3', to: 'C5', names: 'all' }, listen: 'C4+E4+G4_4',
+        demo: { tl: 'pedal', names: ['C'], vars: [{ id: 'without', pedal: 'off', hold: 0.5 }, { id: 'with', pedal: 'hold', hold: 0.5 }] } },
+      { id: 'change', type: 'learn', showPedal: true, pic: { from: 'A3', to: 'C5', names: 'all' }, listen: 'C4+E4+G4_2 C4+F4+A4_2 | B3+D4+G4_2 C4+E4+G4_2',
+        demo: { tl: 'pedal', names: ['C', 'F', 'G', 'C'], vars: [{ id: 'clean', pedal: 'clean', lift: 0.3 }, { id: 'early', pedal: 'early', lift: 0.3 }, { id: 'never', pedal: 'never', lift: 0.3 }] } },
       { id: 'chords', type: 'play', pedal: 'bar',
         text: 'C4/1+E4/3+G4/5_4 | C4/1+F4/3+A4/5_4 | R:B3/1+D4/2+G4/5_4 | C4/1+E4/3+G4/5_4' },
       { id: 'bass', type: 'play', pedal: 'bar',
@@ -352,6 +356,199 @@ var Lessons = (function () {
     return out.join('');
   }
 
+  // ---- demos on learn cards: Listen plays an example and draws it on a timeline under the keyboard.
+  // step.demo: { tl: 'count' (note values, counts, clicks) | 'vel' (how strongly each note is struck) |
+  //   'legato' (each key's time down, by pitch) | 'pedal' (keys, sound, pedal),
+  //   tempo: speed (count demos; else the Listen speed), dyn: ['p', 'f', ...] per bar or 'cresc',
+  //   vars: [{ id, legato: 'joined'|'gap'|'blur' } | { id, pedal: 'clean'|'early'|'never'|'hold'|'off', lift, hold }],
+  //   names: chord names for the pedal timeline }
+  var DEMO_VEL = { p: 38, f: 108 };
+  function demoVar(step, id) {
+    var vs = (step.demo && step.demo.vars) || [];
+    return vs.filter(function (v) { return v.id === id; })[0] || vs[0] || {};
+  }
+  // Everything the example does, in seconds from its start: notes (key down on..off, sound until snd,
+  // velocity v, written length in beats), rests, pedal moves, metronome clicks.
+  function demoPlan(step, varId, speed) {
+    var d = step.demo || {}, v = demoVar(step, varId), p = parseSongText(step.listen);
+    var sc = 1 / (d.tempo || speed || 1), beat = 0.5 * sc, barBeats = p.meter[0] * 4 / p.meter[1];
+    var lead = v.pedal === 'hold' ? 0.3 : 0;   // the foot goes down before the chord
+    var restBeats = p.rests.map(function (r) { return r / 0.5; });
+    var notes = p.notes.map(function (n) {
+      // as in the sheet music: a note lasts until that hand's next note, a rest or the bar line
+      var b0 = n.t / 0.5, stop = (Math.floor(b0 / barBeats + 1e-6) + 1) * barBeats;
+      p.notes.forEach(function (x) { if (x.h === n.h && x.t / 0.5 > b0 + 1e-6) stop = Math.min(stop, x.t / 0.5); });
+      restBeats.forEach(function (r) { if (r > b0 + 1e-6) stop = Math.min(stop, r); });
+      var beats = Math.max(Math.round(n.d / 0.46 * 8) / 8, Math.round((stop - b0) * 8) / 8);
+      return { m: n.m, h: n.h, on: lead + n.t * sc, len: beats * beat, beats: beats, b: b0 };
+    });
+    var onsets = [];
+    notes.forEach(function (n) { if (onsets.indexOf(n.on) < 0) onsets.push(n.on); });
+    onsets.sort(function (a, b) { return a - b; });
+    function nextOn(n) {   // the next note of the same hand (a chord counts once)
+      var o = notes.filter(function (x) { return x.h === n.h && x.on > n.on + 1e-6; }).map(function (x) { return x.on; });
+      return o.length ? Math.min.apply(null, o) : null;
+    }
+    var vel = null;
+    if (d.dyn === 'cresc') {
+      vel = function (n) { var i = onsets.indexOf(n.on); return Math.round(30 + (115 - 30) * i / Math.max(1, onsets.length - 1)); };
+    } else if (d.dyn) {
+      vel = function (n) { return DEMO_VEL[d.dyn[Math.min(d.dyn.length - 1, Math.floor(n.b / barBeats + 1e-6))]] || 80; };
+    }
+    notes.forEach(function (n) {
+      var nx = nextOn(n), gap = nx != null ? nx - n.on : n.len;
+      if (v.legato === 'joined') n.off = nx != null ? nx + 0.01 : n.on + n.len;
+      else if (v.legato === 'gap') n.off = n.on + gap * 0.5;
+      else if (v.legato === 'blur') n.off = n.on + gap * 1.6;
+      else if (v.hold) n.off = n.on + v.hold;
+      else if (v.lift) {   // chord by chord: the hands leave before the next chord (of either hand)
+        var nc = onsets.filter(function (t) { return t > n.on + 1e-6; })[0];
+        n.off = Math.max(n.on + 0.15, (nc != null ? nc : n.on + n.len) - v.lift);
+      }
+      else n.off = n.on + Math.max(0.08, n.len - 0.04);
+      if (vel) n.v = vel(n);
+    });
+    var end = Math.max.apply(null, notes.map(function (n) { return n.on + n.len; }));
+    var first = onsets[0] || 0, ped = [];
+    if (v.pedal === 'hold') ped = [{ at: 0, down: true }, { at: end, down: false }];
+    else if (v.pedal === 'never') ped = [{ at: first + 0.15, down: true }, { at: end, down: false }];
+    else if (v.pedal === 'clean' || v.pedal === 'early') {
+      ped.push({ at: first + 0.15, down: true });
+      onsets.slice(1).forEach(function (t) {
+        // clean: up and down again just after the new chord; early: up before the hands leave
+        ped.push({ at: v.pedal === 'clean' ? t + 0.06 : t - (v.lift || 0.3) - 0.15, down: false });
+        ped.push({ at: t + 0.22, down: true });
+      });
+      ped.push({ at: end, down: false });
+    }
+    function upAfter(x) {   // the sound of a key let go at x lasts until the pedal is up
+      var down = false;
+      ped.forEach(function (e) { if (e.at <= x) down = e.down; });
+      if (!down) return x;
+      var up = ped.filter(function (e) { return !e.down && e.at > x; })[0];
+      return up ? up.at : end;
+    }
+    notes.forEach(function (n) { n.snd = upAfter(n.off); });
+    var rests = [];
+    ['R', 'L'].forEach(function (h) {
+      var hn = notes.filter(function (n) { return n.h === h; }), at = 0;
+      if (!hn.length) return;
+      onsets.forEach(function (t) {
+        var c = hn.filter(function (n) { return n.on === t; })[0];
+        if (!c) return;
+        var gapBeats = Math.round((c.on - lead - at) / beat * 8) / 8;
+        if (gapBeats >= 1) rests.push({ h: h, on: lead + at, beats: gapBeats });
+        at = c.on - lead + c.beats * beat;
+      });
+    });
+    var total = Math.ceil(p.beats / barBeats - 1e-6) * barBeats, clicks = [];
+    if (d.tl === 'count') for (var b = 0; b < total; b++) clicks.push({ at: lead + b * beat, accent: b % barBeats === 0 });
+    var dur = Math.max(end, d.tl === 'count' ? lead + total * beat : 0);
+    notes.forEach(function (n) { dur = Math.max(dur, n.snd, n.off); });
+    return { tl: d.tl, notes: notes, rests: rests, pedal: ped, clicks: clicks, beat: beat, bar: barBeats,
+      beats: total, lead: lead, dur: dur, names: d.names || [], dyn: d.dyn };
+  }
+
+  // Small note and rest symbols (x: left edge, y: middle of the note head).
+  function glyph(beats, rest, x, y) {
+    var hollow = beats >= 2, stem = beats < 4, dot = beats === 3 || beats === 1.5, cx = x + 5;
+    if (rest) {
+      if (beats >= 4) return '<rect class="gs" x="' + (cx - 4) + '" y="' + (y - 4) + '" width="8" height="3"/><line class="gl" x1="' + (cx - 6) + '" y1="' + (y - 4) + '" x2="' + (cx + 6) + '" y2="' + (y - 4) + '"/>';
+      if (beats >= 2) return '<rect class="gs" x="' + (cx - 4) + '" y="' + (y - 1) + '" width="8" height="3"/><line class="gl" x1="' + (cx - 6) + '" y1="' + (y + 2) + '" x2="' + (cx + 6) + '" y2="' + (y + 2) + '"/>';
+      return '<path class="gr" d="M' + (cx - 1.5) + ' ' + (y - 9) + 'l3.5 4.5-3 3.5 3.5 4.5c-2.5-1.2-4.5 0-2.2 2.5"/>';
+    }
+    var s = '<ellipse class="' + (hollow ? 'gh' : 'gs') + '" cx="' + cx + '" cy="' + y + '" rx="' + (beats >= 4 ? 4.6 : 3.9) + '" ry="2.9" transform="rotate(-20 ' + cx + ' ' + y + ')"/>';
+    if (stem) s += '<line class="gl" x1="' + (cx + 3.6) + '" y1="' + (y - 1) + '" x2="' + (cx + 3.6) + '" y2="' + (y - 15) + '"/>';
+    if (dot) s += '<circle class="gs" cx="' + (cx + 8) + '" cy="' + y + '" r="1.2"/>';
+    return s;
+  }
+
+  // The timeline as SVG. Notes are rect.tn[data-i] (index in plan.notes), counts text.tc[data-b],
+  // the playhead line.ph: app.js moves it and marks what sounds while the example plays.
+  // labels: { keys, sound, pedal } (row names of the pedal timeline).
+  function timelineSvg(plan, labels) {
+    var W = 400, LW = plan.tl === 'pedal' ? 46 : 4, out = [], y = 4, rows = [];
+    var span = plan.dur > 0 ? plan.dur : 1;
+    function X(t) { return LW + t / span * (W - LW - 4); }
+    function bar(n, i, cls, y0, h, to) {
+      return '<rect class="tn ' + cls + '" data-i="' + i + '" x="' + X(n.on).toFixed(1) + '" y="' + y0 + '" width="' + Math.max(1.5, X(to) - X(n.on) - 0.8).toFixed(1) + '" height="' + h + '" rx="2"/>';
+    }
+    if (plan.tl === 'count') {
+      ['R', 'L'].forEach(function (h) {
+        if (!plan.notes.some(function (n) { return n.h === h; })) return;
+        plan.notes.forEach(function (n, i) { if (n.h === h) out.push(glyph(n.beats, false, X(n.on) - 1, y + 16)); });
+        plan.rests.forEach(function (r) { if (r.h === h) out.push(glyph(r.beats, true, X(r.on) - 1, y + 14)); });
+        y += 23;
+        plan.notes.forEach(function (n, i) { if (n.h === h) out.push(bar(n, i, h, y, 9, n.on + n.beats * plan.beat)); });
+        y += 14;
+      });
+      for (var b = 0; b < plan.beats; b++) {
+        out.push('<text class="tc' + (b % plan.bar === 0 ? ' one' : '') + '" data-b="' + b + '" x="' + (X(plan.lead + b * plan.beat) + 5).toFixed(1) + '" y="' + (y + 10) + '">' + (b % plan.bar + 1) + '</text>');
+      }
+      for (var k = 1; k * plan.bar < plan.beats; k++) {
+        var bx = X(plan.lead + k * plan.bar * plan.beat) - 1.5;
+        out.push('<line class="bl" x1="' + bx.toFixed(1) + '" y1="2" x2="' + bx.toFixed(1) + '" y2="' + (y + 12) + '"/>');
+      }
+      y += 14;
+    } else if (plan.tl === 'vel') {
+      var base = y + 46;
+      plan.notes.forEach(function (n, i) {
+        var hgt = Math.max(3, (n.v || 80) / 127 * 44);
+        out.push('<rect class="tn v" data-i="' + i + '" x="' + X(n.on).toFixed(1) + '" y="' + (base - hgt).toFixed(1) + '" width="' + Math.max(2, X(n.on + n.len) - X(n.on) - 2).toFixed(1) + '" height="' + hgt.toFixed(1) + '" rx="1.5"/>');
+      });
+      y = base + 4;
+      if (plan.dyn === 'cresc') {
+        var x0 = X(0) + 2, x1 = X(plan.dur) - 2;
+        out.push('<path class="hp" d="M' + x1 + ' ' + (y + 2) + 'L' + x0 + ' ' + (y + 7) + 'L' + x1 + ' ' + (y + 12) + '"/>');
+      } else if (plan.dyn) {
+        plan.dyn.forEach(function (dd, k) {
+          if (k > 0 && plan.dyn[k - 1] === dd) return;
+          out.push('<text class="dm" x="' + (X(k * plan.bar * plan.beat) + 3).toFixed(1) + '" y="' + (y + 12) + '">' + dd + '</text>');
+        });
+      }
+      y += 16;
+    } else if (plan.tl === 'legato') {
+      var ms = [];
+      plan.notes.forEach(function (n) { if (ms.indexOf(n.m) < 0) ms.push(n.m); });
+      ms.sort(function (a, b) { return b - a; });
+      plan.notes.forEach(function (n, i) { out.push(bar(n, i, n.h, y + ms.indexOf(n.m) * 10, 8, n.off)); });
+      y += ms.length * 10 + 2;
+    } else if (plan.tl === 'pedal') {
+      var chords = [];   // one bar per chord: keys down, then what you hear
+      plan.notes.forEach(function (n, i) { if (!chords.some(function (c) { return c.on === n.on; })) chords.push({ on: n.on, off: n.off, snd: n.snd, i: i }); });
+      rows.push([y + 9, labels.keys]);
+      chords.forEach(function (c, k) {
+        out.push(bar(c, c.i, 'R', y, 13, c.off));
+        if (plan.names[k]) out.push('<text class="cn" x="' + (X(c.on) + 4).toFixed(1) + '" y="' + (y + 10) + '">' + plan.names[k] + '</text>');
+      });
+      y += 18;
+      rows.push([y + 9, labels.sound]);
+      chords.forEach(function (c) {
+        out.push('<rect class="snd" x="' + X(c.on).toFixed(1) + '" y="' + y + '" width="' + Math.max(1.5, X(c.snd) - X(c.on)).toFixed(1) + '" height="13" rx="2"/>');
+      });
+      chords.forEach(function (c, k) {   // drawn over the sound bars
+        var nx = chords[k + 1];
+        if (nx && c.snd > nx.on + 0.12) {   // two chords sounding together: they blur
+          out.push('<rect class="clash" x="' + X(nx.on).toFixed(1) + '" y="' + y + '" width="' + (X(c.snd) - X(nx.on)).toFixed(1) + '" height="13"/>');
+        }
+      });
+      y += 18;
+      rows.push([y + 9, labels.pedal]);
+      var top = y + 2, low = y + 12, path = 'M' + X(0).toFixed(1) + ' ' + top, isDown = false;
+      plan.pedal.forEach(function (e) {
+        var px = X(e.at).toFixed(1);
+        path += 'L' + px + ' ' + (isDown ? low : top) + 'L' + px + ' ' + (e.down ? low : top);
+        isDown = e.down;
+      });
+      path += 'L' + X(plan.dur).toFixed(1) + ' ' + (isDown ? low : top);
+      out.push('<path class="pd" d="' + path + '"/>');
+      y += 16;
+      rows.forEach(function (r) { out.unshift('<text class="rl" x="0" y="' + (r[0] + 3) + '">' + r[1] + '</text>'); });
+    }
+    out.push('<line class="ph" x1="' + X(0) + '" y1="0" x2="' + X(0) + '" y2="' + y + '"/>');
+    return '<svg class="tline" viewBox="0 0 ' + W + ' ' + y + '" data-x0="' + LW + '" data-w="' + (W - LW - 4) + '" data-dur="' + span + '" aria-hidden="true">' + out.join('') + '</svg>';
+  }
+
   // ---- "find" steps: does key m count? (find: 'C' = any C, 'C4' = that key)
   function findMatch(step, m) {
     if (/\d/.test(step.find)) return m === parseNoteName(step.find);
@@ -361,7 +558,8 @@ var Lessons = (function () {
   return { LIST: LIST, PASS: PASS, MARK: MARK, get: get, next: next, stepIndex: stepIndex, key: key, plays: plays,
     song: song, playFrom: playFrom, hands: hands, barOf: barOf, picFor: picFor, passedCount: passedCount, status: status,
     holdSpans: holdSpans, holdBroken: holdBroken, legatoGrade: legatoGrade, pedalPoints: pedalPoints,
-    pedalCheck: pedalCheck, pedalPassed: pedalPassed, dynAt: dynAt, dynCheck: dynCheck, keysSvg: keysSvg, findMatch: findMatch };
+    pedalCheck: pedalCheck, pedalPassed: pedalPassed, dynAt: dynAt, dynCheck: dynCheck, keysSvg: keysSvg, findMatch: findMatch,
+    demoPlan: demoPlan, demoVar: demoVar, timelineSvg: timelineSvg };
 })();
 
 if (typeof module !== 'undefined') module.exports = { Lessons: Lessons };

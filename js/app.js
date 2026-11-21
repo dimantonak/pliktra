@@ -269,7 +269,7 @@
   function isLesson() { return !!(st.song && st.song.lesson); }
   // Reading mode: find the notes on the sheet music yourself. The screen keyboard shows the key to play
   // (and its finger) only after a wrong key, or when a note in the score is tapped (explanation card).
-  function readingOn() { return (!!settings.reading || isDrill()) && sheetOn(); }   // note reading: always
+  function readingOn() { return (!!settings.reading || isDrill()) && sheetOn() && !isLesson(); }   // lessons always show the keys   // note reading: always
   function keyHintsOn() { return !readingOn() || !!st.rescue; }
 
   function refreshSheet() {
@@ -712,6 +712,7 @@
     tx.innerHTML = '';
     t(Lessons.key(l, s, 'x')).split('\n').forEach(function (p) { tx.appendChild(el('p', '', p)); });
     $('#lcListen').hidden = !(s.listen || s.type === 'play');
+    renderCardDemo(s);
     $('#lcBack').hidden = lc.i === 0;
     var last = lc.i + 1 >= l.steps.length;
     $('#lcNext').textContent = s.type === 'play' ? t('lcPlay') : last ? t('lessonNext') : t('lcNext');
@@ -722,6 +723,7 @@
   // The picture: keys held on the piano, sounding in Listen, found. Called every frame; redraws on change.
   function updateLessonCard() {
     if (!lc) return;
+    tickCardDemo();
     var s = lc.l.steps[lc.i], pic = Lessons.picFor(s), lit = {};
     Object.keys(demoKeys).forEach(function (m) { lit[m] = 'play'; });
     Object.keys(lc.found).forEach(function (m) { lit[m] = 'ok'; });
@@ -771,9 +773,68 @@
     else nextLessonCard();
   };
   $('#lcBack').onclick = function () { if (lc && lc.i > 0) openLessonCard(lc.l.id, lc.i - 1); };
+  // Learn cards with a demo: version buttons (e.g. joined / with gaps / held too long), the timeline, a caption.
+  var DEMO_TXT = { joined: ['demoJoined', 'demoJoinedX'], gap: ['demoGap', 'demoGapX'], blur: ['demoBlur', 'demoBlurX'],
+    clean: ['demoClean', 'demoCleanX'], early: ['demoEarly', 'demoEarlyX'], never: ['demoNever', 'demoNeverX'],
+    without: ['demoWithout', 'demoWithoutX'], 'with': ['demoWith', 'demoWithX'] };
+  function cardDemoPlan(s) { return Lessons.demoPlan(s, lc.v, +settings.listenSpeed || 1); }
+  function renderCardDemo(s) {
+    $('#lcDemo').hidden = !s.demo;
+    $('#mLesson .lesson-card').classList.toggle('has-demo', !!s.demo);
+    if (!s.demo) { $('#lcTl').innerHTML = ''; return; }
+    var vs = s.demo.vars || [], v = Lessons.demoVar(s, lc.v), seg = $('#lcVars');
+    lc.v = v.id;
+    seg.innerHTML = '';
+    seg.hidden = vs.length < 2;
+    vs.forEach(function (x) {
+      var b = el('button', x.id === v.id ? 'on' : '', t(DEMO_TXT[x.id][0]));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', x.id === v.id ? 'true' : 'false');
+      b.onclick = function () { lc.v = x.id; renderCardDemo(s); playCardDemo(s); };   // tap a version: hear it
+      seg.appendChild(b);
+    });
+    $('#lcVarText').textContent = v.id ? t(DEMO_TXT[v.id][1]) : '';
+    $('#lcTl').innerHTML = Lessons.timelineSvg(cardDemoPlan(s), { keys: t('tlKeys'), sound: t('tlSound'), pedal: t('tlPedal') });
+  }
+  // Plays the demo: keys light up, notes as loud as planned, the pedal (sent to the piano, or the sound held
+  // longer on the built-in synth), metronome clicks; the timeline's line moves along (tickCardDemo).
+  function playCardDemo(s) {
+    stopPreview();
+    var plan = cardDemoPlan(s), d = { out: demoOutput(), nodes: [], timers: [], sent: {}, seq: 0, owner: {}, timer: 0 };
+    var start = performance.now() + 150;
+    plan.notes.forEach(function (n) { demoNote(d, n, start + n.on * 1000, start + n.off * 1000, start + n.snd * 1000); });
+    if (d.out) plan.pedal.forEach(function (e) {
+      try { d.out.send([0xB0, 64, e.down ? 127 : 0], start + e.at * 1000); d.ped = true; } catch (x) { /* unplugged */ }
+    });
+    plan.clicks.forEach(function (c) { d.nodes.push(synth.click((start + c.at * 1000 - performance.now()) / 1000, c.accent)); });
+    d.timers.push(setTimeout(function () { if (preview === d) stopPreview(); }, start + plan.dur * 1000 - performance.now() + 400));
+    preview = d;
+    lc.play = { start: start, plan: plan };
+  }
+  // Every frame while a card is open: the timeline's line, the notes sounding, the count.
+  function tickCardDemo() {
+    var svg = document.querySelector('#lcTl svg');
+    if (!svg) return;
+    var p = lc.play;
+    if (!p) {
+      if (svg.classList.contains('playing')) {
+        svg.classList.remove('playing');
+        svg.querySelectorAll('.on, .now').forEach(function (e) { e.classList.remove('on'); e.classList.remove('now'); });
+      }
+      return;
+    }
+    var tt = (performance.now() - p.start) / 1000, x = +svg.getAttribute('data-x0') + Math.max(0, Math.min(1, tt / +svg.getAttribute('data-dur'))) * +svg.getAttribute('data-w');
+    var ph = svg.querySelector('.ph');
+    ph.setAttribute('x1', x.toFixed(1)); ph.setAttribute('x2', x.toFixed(1));
+    svg.classList.add('playing');
+    svg.querySelectorAll('.tn').forEach(function (r) { var n = p.plan.notes[+r.getAttribute('data-i')]; r.classList.toggle('on', tt >= n.on && tt < n.off); });
+    var b = tt >= p.plan.lead ? Math.floor((tt - p.plan.lead) / p.plan.beat) : -1;
+    svg.querySelectorAll('.tc').forEach(function (e) { e.classList.toggle('now', +e.getAttribute('data-b') === b); });
+  }
   $('#lcListen').onclick = function () {
     if (!lc) return;
     var s = lc.l.steps[lc.i], sp = +settings.listenSpeed || 1;
+    if (s.demo) { playCardDemo(s); return; }
     stopPreview();
     var notes = playbackNotes(parseSongText(s.listen || s.text).notes);
     var d = { out: demoOutput(), nodes: [], timers: [], sent: {}, seq: 0, owner: {}, timer: 0 };
@@ -792,6 +853,7 @@
     if (!d) return;
     preview = null;
     silence(d);
+    if (lc) lc.play = null;
     dirty = true;
   }
   // The picture's keys can be tapped too (without a piano the card covers the screen keyboard).
@@ -1144,9 +1206,10 @@
       voices[m] = { o: o, o2: o2, g: g };
     }
     // Scheduled note for Listen: starts after `delay` s, lasts `dur` s. Returns a handle for stopAll.
-    function play(m, delay, dur) {
+    function play(m, delay, dur, vel) {
       var a = ctx();
       if (!a) return null;
+      var peak = vel ? 0.22 * Math.pow(vel / 110, 1.5) : 0.2;   // how strongly the key is struck (MIDI velocity)
       var f = 440 * Math.pow(2, (m - 69) / 12), t = a.currentTime + Math.max(0, delay), end = t + Math.max(0.08, dur);
       var o = a.createOscillator(), o2 = a.createOscillator(), g = a.createGain(), g2 = a.createGain();
       o.type = 'triangle'; o.frequency.value = f;
@@ -1154,8 +1217,8 @@
       o.connect(g); o2.connect(g2); g2.connect(g); g.connect(a.destination);
       g.gain.value = 0;
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.2, t + 0.01);
-      g.gain.setTargetAtTime(0.05, t + 0.01, 0.5);   // piano-like decay
+      g.gain.linearRampToValueAtTime(peak, t + 0.01);
+      g.gain.setTargetAtTime(peak / 4, t + 0.01, 0.5);   // piano-like decay
       g.gain.setTargetAtTime(0, end, 0.06);          // release
       o.start(t); o2.start(t); o.stop(end + 0.5); o2.stop(end + 0.5);
       return { o: o, o2: o2, g: g };
@@ -1244,15 +1307,16 @@
     if (d.ni >= d.notes.length && now > d.endMs + 300) stopDemo();
   }
 
-  function demoNote(d, n, onMs, offMs) {
+  // sndMs: the sound lasts longer than the key (the pedal; the piano does that itself from its pedal message).
+  function demoNote(d, n, onMs, offMs, sndMs) {
     if (d.out) {
       try {
-        d.out.send([0x90, n.m, 80], onMs);
+        d.out.send([0x90, n.m, n.v || 80], onMs);
         d.out.send([0x80, n.m, 0], offMs);
         d.sent[n.m] = true;
       } catch (e) { d.out = null; }   // piano went away: continue with the synth
     }
-    if (!d.out) d.nodes.push(synth.play(n.m, (onMs - performance.now()) / 1000, (offMs - onMs) / 1000));
+    if (!d.out) d.nodes.push(synth.play(n.m, (onMs - performance.now()) / 1000, (Math.max(offMs, sndMs || 0) - onMs) / 1000, n.v));
     // The key lights up while it sounds; only this note's own release turns it off again.
     var id = ++d.seq;
     d.timers.push(setTimeout(function () { demoKeys[n.m] = n.h; d.owner[n.m] = id; dirty = true; }, Math.max(0, onMs - performance.now())));
@@ -1282,6 +1346,7 @@
         try {
           Object.keys(d.sent).forEach(function (m) { out.send([0x80, +m, 0]); });
           out.send([0xB0, 123, 0]);   // all notes off
+          if (d.ped) out.send([0xB0, 64, 0]);   // a lesson demo's pedal up
         } catch (e) { /* unplugged */ }
       };
       try { if (out.clear) out.clear(); } catch (e) { /* not supported */ }
@@ -2593,7 +2658,7 @@
   showViewToggle();
   function showReadToggle() {
     var b = $('#btnRead'), on = readingOn();
-    b.disabled = !sheetOn() || isDrill();
+    b.disabled = !sheetOn() || isDrill() || isLesson();
     b.title = t(isDrill() ? 'drillAlwaysRead' : sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
