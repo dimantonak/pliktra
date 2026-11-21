@@ -438,6 +438,7 @@ body {
 .tline .tc { fill: var(--muted); font-size: 9px; }
 .tline .tc.one { font-weight: 700; }
 .tline .tc.now { fill: var(--text); font-weight: 800; }
+.tline .tc.and { font-size: 8px; }
 .tline .bl { stroke: var(--line-hi); stroke-width: 1; }
 .tline .dm { fill: var(--text); font: italic 700 12px Georgia, serif; }
 .tline .hp { fill: none; stroke: var(--text); stroke-width: 1.3; }

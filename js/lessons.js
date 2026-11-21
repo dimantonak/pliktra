@@ -7,6 +7,7 @@
 //          legato: 'R' / 'L' / 'B'  each note joined to the next one (no gap, no long overlap)
 //          pedal: 'bar'  the sustain pedal changed with each bar's chord (legato pedalling)
 //          tempo: 0.6  played along at that speed with the metronome (timing score) instead of wait mode
+// Lesson order is the order of LIST (shown numbered); progress is kept by id, so a lesson can be inserted.
 // A learn card with `demo` draws its Listen example on a timeline (see demoPlan).
 // Texts are i18n keys: lx_<lesson>_<step>_t (title), _x (text), _h (hint while playing, play steps).
 // A lesson is learnt when every play step is passed (and was, before lessons had steps, with 95%+).
@@ -64,6 +65,22 @@ var Lessons = (function () {
       { id: 'piece', type: 'play', hold: 'L',
         text: 'C3/5+C4/1 D4/2 E4/3 F4/4 | G3/1+G4/5 F4/4 E4/3 D4/2 | E3/3+E4/3 D4/2 C4/1 D4/2 | G3/1+E4/3 F4/4 G4/5_2 |\n' +
               'C3/5+E4/3 D4/2 E3/3+C4/1 D4/2 | F3/2+F4/4 E4/3 E3/3+G4/5 E4/3 | D3/4+D4/2 F4/4 G3/1+G4/5 F4/4 | C3/5+E4/3 D4/2 C4/1_2' }
+    ] },
+    { id: 'rhythm', name: 'lessonRhythm', desc: 'lessonRhythmDesc', steps: [
+      { id: 'eighth', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 C4 D4_0.5 D4_0.5 E4 | E4_0.5 D4_0.5 C4_0.5 D4_0.5 E4 E4 | C4_4', demo: { tl: 'count', tempo: 0.6 } },
+      { id: 'pairs', type: 'play', tempo: 0.4,
+        text: 'C4/1 D4/2 E4/3 E4/3 | D4/2_0.5 D4/2_0.5 E4/3_0.5 E4/3_0.5 D4/2_2 | E4/3_0.5 F4/4_0.5 G4/5 G4/5_0.5 F4/4_0.5 E4/3 | D4/2_0.5 D4/2_0.5 D4/2 C4/1_2' },
+      { id: 'dot', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4_3 E4 | D4_3 F4 | E4_1.5 D4_0.5 D4_2 | C4_4', demo: { tl: 'count', tempo: 0.6 } },
+      { id: 'dots', type: 'play', tempo: 0.4, text: 'C4/1_3 D4/2 | E4/3_3 F4/4 | G4/5_1.5 F4/4_0.5 E4/3 D4/2 | C4/1_1.5 D4/2_0.5 C4/1_2' },
+      // Ode to Joy: melody by Ludwig van Beethoven (1824), public domain
+      { id: 'ode', type: 'play', tempo: 0.6,
+        text: 'E4/3 E4/3 F4/4 G4/5 | G4/5 F4/4 E4/3 D4/2 | C4/1 C4/1 D4/2 E4/3 | E4/3_1.5 D4/2_0.5 D4/2_2 |\n' +
+              'E4/3 E4/3 F4/4 G4/5 | G4/5 F4/4 E4/3 D4/2 | C4/1 C4/1 D4/2 E4/3 | D4/2_1.5 C4/1_0.5 C4/1_2' },
+      { id: 'three', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: '3/4 C4 E4 G4 | G4_2 E4 | F4 D4 F4 | E4_3', demo: { tl: 'count', tempo: 0.6 } },
+      // written for Pliktra
+      { id: 'waltz', type: 'play', tempo: 0.6,
+        text: '3/4 C3/5+C4/1 E4/3 G4/5 | C3/5+G4/5_2 E4/3 | G3/1+F4/4_0.5 E4/3_0.5 D4/2 F4/4 | C3/5+E4/3_3 |\n' +
+              'C3/5+C4/1 E4/3 G4/5 | C3/5+G4/5_2 E4/3 | G3/1+F4/4_0.5 E4/3_0.5 D4/2 E4/3_0.5 D4/2_0.5 | C3/5+C4/1_3' }
     ] },
     { id: 'dynamics', name: 'lessonDyn', desc: 'lessonDynDesc', steps: [
       { id: 'pf', type: 'learn', pic: { from: 'C4', to: 'C5', names: 'all' }, listen: 'C4 E4 G4 E4 | C4 E4 G4 E4 | C4_4', demo: { tl: 'vel', dyn: ['p', 'f', 'f'] } },
@@ -451,7 +468,7 @@ var Lessons = (function () {
 
   // Small note and rest symbols (x: left edge, y: middle of the note head).
   function glyph(beats, rest, x, y) {
-    var hollow = beats >= 2, stem = beats < 4, dot = beats === 3 || beats === 1.5, cx = x + 5;
+    var hollow = beats >= 2, stem = beats < 4, dot = beats === 3 || beats === 1.5 || beats === 0.75, cx = x + 5;
     if (rest) {
       if (beats >= 4) return '<rect class="gs" x="' + (cx - 4) + '" y="' + (y - 4) + '" width="8" height="3"/><line class="gl" x1="' + (cx - 6) + '" y1="' + (y - 4) + '" x2="' + (cx + 6) + '" y2="' + (y - 4) + '"/>';
       if (beats >= 2) return '<rect class="gs" x="' + (cx - 4) + '" y="' + (y - 1) + '" width="8" height="3"/><line class="gl" x1="' + (cx - 6) + '" y1="' + (y + 2) + '" x2="' + (cx + 6) + '" y2="' + (y + 2) + '"/>';
@@ -459,6 +476,7 @@ var Lessons = (function () {
     }
     var s = '<ellipse class="' + (hollow ? 'gh' : 'gs') + '" cx="' + cx + '" cy="' + y + '" rx="' + (beats >= 4 ? 4.6 : 3.9) + '" ry="2.9" transform="rotate(-20 ' + cx + ' ' + y + ')"/>';
     if (stem) s += '<line class="gl" x1="' + (cx + 3.6) + '" y1="' + (y - 1) + '" x2="' + (cx + 3.6) + '" y2="' + (y - 15) + '"/>';
+    if (beats < 1) s += '<path class="gr" d="M' + (cx + 3.6) + ' ' + (y - 15) + 'q1 4 4.5 6.5"/>';   // eighth note: a flag
     if (dot) s += '<circle class="gs" cx="' + (cx + 8) + '" cy="' + y + '" r="1.2"/>';
     return s;
   }
@@ -468,6 +486,7 @@ var Lessons = (function () {
   // labels: { keys, sound, pedal } (row names of the pedal timeline).
   function timelineSvg(plan, labels) {
     var W = 400, LW = plan.tl === 'pedal' ? 46 : 4, out = [], y = 4, rows = [];
+    var halves = plan.tl === 'count' && plan.notes.some(function (n) { return Math.abs(n.b - Math.round(n.b)) > 1e-6; });
     var span = plan.dur > 0 ? plan.dur : 1;
     function X(t) { return LW + t / span * (W - LW - 4); }
     function bar(n, i, cls, y0, h, to) {
@@ -484,6 +503,7 @@ var Lessons = (function () {
       });
       for (var b = 0; b < plan.beats; b++) {
         out.push('<text class="tc' + (b % plan.bar === 0 ? ' one' : '') + '" data-b="' + b + '" x="' + (X(plan.lead + b * plan.beat) + 5).toFixed(1) + '" y="' + (y + 10) + '">' + (b % plan.bar + 1) + '</text>');
+        if (halves) out.push('<text class="tc and" data-b="' + (b + 0.5) + '" x="' + (X(plan.lead + (b + 0.5) * plan.beat) + 5).toFixed(1) + '" y="' + (y + 10) + '">+</text>');   // “and”
       }
       for (var k = 1; k * plan.bar < plan.beats; k++) {
         var bx = X(plan.lead + k * plan.bar * plan.beat) - 1.5;
@@ -546,7 +566,7 @@ var Lessons = (function () {
       rows.forEach(function (r) { out.unshift('<text class="rl" x="0" y="' + (r[0] + 3) + '">' + r[1] + '</text>'); });
     }
     out.push('<line class="ph" x1="' + X(0) + '" y1="0" x2="' + X(0) + '" y2="' + y + '"/>');
-    return '<svg class="tline" viewBox="0 0 ' + W + ' ' + y + '" data-x0="' + LW + '" data-w="' + (W - LW - 4) + '" data-dur="' + span + '" aria-hidden="true">' + out.join('') + '</svg>';
+    return '<svg class="tline" viewBox="0 0 ' + W + ' ' + y + '" data-x0="' + LW + '" data-w="' + (W - LW - 4) + '" data-dur="' + span + '" data-step="' + (halves ? 0.5 : 1) + '" aria-hidden="true">' + out.join('') + '</svg>';
   }
 
   // ---- "find" steps: does key m count? (find: 'C' = any C, 'C4' = that key)

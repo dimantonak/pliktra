@@ -810,6 +810,7 @@
     d.timers.push(setTimeout(function () { if (preview === d) stopPreview(); }, start + plan.dur * 1000 - performance.now() + 400));
     preview = d;
     lc.play = { start: start, plan: plan };
+    showCardListen();
   }
   // Every frame while a card is open: the timeline's line, the notes sounding, the count.
   function tickCardDemo() {
@@ -828,11 +829,21 @@
     ph.setAttribute('x1', x.toFixed(1)); ph.setAttribute('x2', x.toFixed(1));
     svg.classList.add('playing');
     svg.querySelectorAll('.tn').forEach(function (r) { var n = p.plan.notes[+r.getAttribute('data-i')]; r.classList.toggle('on', tt >= n.on && tt < n.off); });
-    var b = tt >= p.plan.lead ? Math.floor((tt - p.plan.lead) / p.plan.beat) : -1;
+    var st = +svg.getAttribute('data-step') || 1;   // 0.5: the “and” between the clicks is counted too
+    var b = tt >= p.plan.lead ? Math.floor((tt - p.plan.lead) / p.plan.beat / st) * st : -1;
     svg.querySelectorAll('.tc').forEach(function (e) { e.classList.toggle('now', +e.getAttribute('data-b') === b); });
+  }
+  // The card's Listen button is Stop while an example plays (like Listen on the practice screen).
+  function showCardListen() {
+    var b = $('#lcListen'), on = !!preview;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.firstElementChild.textContent = on ? '\u25A0' : '\u25B6\uFE0E';
+    b.lastElementChild.textContent = t(on ? 'lcStop' : 'lcListen');
   }
   $('#lcListen').onclick = function () {
     if (!lc) return;
+    if (preview) { stopPreview(); return; }
     var s = lc.l.steps[lc.i], sp = +settings.listenSpeed || 1;
     if (s.demo) { playCardDemo(s); return; }
     stopPreview();
@@ -847,6 +858,7 @@
     });
     d.timers.push(setTimeout(function () { if (preview === d) stopPreview(); }, end - performance.now() + 300));
     preview = d;
+    showCardListen();
   };
   function stopPreview() {
     var d = preview;
@@ -854,6 +866,7 @@
     preview = null;
     silence(d);
     if (lc) lc.play = null;
+    showCardListen();
     dirty = true;
   }
   // The picture's keys can be tapped too (without a piano the card covers the screen keyboard).
@@ -2659,7 +2672,7 @@
   function showReadToggle() {
     var b = $('#btnRead'), on = readingOn();
     b.disabled = !sheetOn() || isDrill() || isLesson();
-    b.title = t(isDrill() ? 'drillAlwaysRead' : sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
+    b.title = t(isDrill() ? 'drillAlwaysRead' : isLesson() ? 'readingOffLesson' : sheetOn() ? 'readingTitle' : 'readingNeedsSheet');
     b.classList.toggle('on', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
   }

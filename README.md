@@ -52,8 +52,8 @@ another device.
 
 ## Lessons and note reading
 
-- **Lessons** (Library → *Lessons* tab): eleven short lessons, one skill each: finding your way on the keyboard,
-  the five-finger position, counting, holding notes, loud and soft, legato, alternating hands, thumb under,
+- **Lessons** (Library → *Lessons* tab): twelve short lessons, one skill each: finding your way on the keyboard,
+  the five-finger position, counting, holding notes, eighth notes, dotted notes and 3/4 time, loud and soft, legato, alternating hands, thumb under,
   the scale in contrary motion, major and minor chords, and the sustain pedal. Each lesson is a row of small steps:
   - *cards* explain the skill, with a keyboard picture (the keys you press light up in it; without a piano
     you can tap its keys) and *Listen*; some ask you to find keys on your piano (e.g. every C);

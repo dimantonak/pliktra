@@ -249,6 +249,25 @@ test('loud and soft demo: velocities', () => {
   assert.ok(cr.every((v, i) => i === 0 || v > cr[i - 1]) && cr[0] < 40 && cr[cr.length - 1] > 100, cr.join(' '));
 });
 
+test('counting 2 demos: eighth notes, dotted notes, 3/4 with the “and” counted', () => {
+  const tl = p => Lessons.timelineSvg(p, {});
+  const e = Lessons.demoPlan(stepOf('rhythm', 'eighth'), null, 1);
+  assert.deepEqual(e.notes.map(n => n.beats), [1, 1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5, 1, 1, 4]);
+  assert.equal(e.clicks.length, 12, 'a click on every beat, not on the “and”');
+  assert.equal((tl(e).match(/class="tc and"/g) || []).length, 12, 'a “+” after every count');
+  assert.ok(/data-step="0.5"/.test(tl(e)) && /q1 4 4.5 6.5/.test(tl(e)), 'counted in halves; eighth notes have a flag');
+  const d = Lessons.demoPlan(stepOf('rhythm', 'dot'), null, 1);
+  assert.deepEqual(d.notes.map(n => n.beats), [3, 1, 3, 1, 1.5, 0.5, 2, 4]);
+  const th = Lessons.demoPlan(stepOf('rhythm', 'three'), null, 1);
+  assert.equal(th.bar, 3);
+  assert.deepEqual(th.clicks.map(c => c.accent), [true, false, false, true, false, false, true, false, false, true, false, false]);
+  assert.deepEqual(th.notes.map(n => n.beats), [1, 1, 1, 2, 1, 1, 1, 1, 3]);
+  assert.ok(!/class="tc and"/.test(tl(th)) && /data-step="1"/.test(tl(th)), 'no “and” when every note is on a click');
+  assert.equal(Lessons.LIST.indexOf(Lessons.get('rhythm')), Lessons.LIST.indexOf(Lessons.get('hold')) + 1, 'after holding notes');
+  const w = parseSongText(stepOf('rhythm', 'waltz').text);
+  assert.deepEqual(w.meter, [3, 4]);
+});
+
 test('counting demos: note values as in the sheet music, rests, a click on every beat', () => {
   const h = Lessons.demoPlan(stepOf('hold', 'halves'), null, 1);
   assert.deepEqual([...new Set(h.notes.filter(n => n.h === 'L').map(n => n.beats))], [2], 'left hand: half notes');
